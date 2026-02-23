@@ -1,0 +1,52 @@
+const mongoose = require("mongoose");
+
+const userSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      index: true,
+    },
+    password: {
+      type: String,
+      required: true,
+      select: false,
+    },
+    role: {
+      type: String,
+      enum: ["SUPER_ADMIN", "HOST", "END_USER"],
+      required: true,
+    },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Tenant",
+      default: null,
+    },
+  },
+  { timestamps: true }
+);
+
+userSchema.pre("validate", function (next) {
+  if (this.role === "SUPER_ADMIN" && this.tenantId) {
+    return next(new Error("SUPER_ADMIN cannot have tenantId"));
+  }
+
+  if (
+    (this.role === "HOST" || this.role === "END_USER") &&
+    !this.tenantId
+  ) {
+    return next(new Error("HOST and END_USER must have tenantId"));
+  }
+
+  next();
+});
+
+module.exports = mongoose.model("User", userSchema);
