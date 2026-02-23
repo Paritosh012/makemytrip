@@ -13,7 +13,6 @@ const userSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
-      index: true,
     },
     password: {
       type: String,
@@ -31,21 +30,13 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 userSchema.pre("validate", function (next) {
   if (this.role === "SUPER_ADMIN" && this.tenantId) {
     return next(new Error("SUPER_ADMIN cannot have tenantId"));
   }
-
-  if (
-    (this.role === "HOST" || this.role === "END_USER") &&
-    !this.tenantId
-  ) {
-    return next(new Error("HOST and END_USER must have tenantId"));
-  }
-
   next();
 });
 

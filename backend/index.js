@@ -5,6 +5,7 @@ const helmet = require("helmet");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const authRoutes = require("./routes/auth.routes");
+const tenantRoutes = require("./routes/tenant.routes");
 
 const connectDB = require("./config/db");
 
@@ -44,6 +45,7 @@ app.get("/health", (req, res) => {
   });
 });
 app.use("/api/auth", authRoutes);
+app.use("/api/tenants", tenantRoutes);
 
 const PORT = process.env.PORT;
 
