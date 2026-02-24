@@ -4,9 +4,9 @@ const User = require("../models/user.model");
 
 const register = async (req, res) => {
   try {
-    const { name, email, password, role, tenantId } = req.body;
+    const { name, email, password } = req.body;
 
-    if (!name || !email || !password || !role) {
+    if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields required" });
     }
 
@@ -21,8 +21,7 @@ const register = async (req, res) => {
       name,
       email,
       password: hashedPassword,
-      role,
-      tenantId: tenantId || null,
+      role: "END_USER",
     });
 
     res.status(201).json({
@@ -30,7 +29,7 @@ const register = async (req, res) => {
       userId: user._id,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -61,12 +60,18 @@ const login = async (req, res) => {
         tenantId: user.tenantId,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "1d" },
     );
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: false,  
+      sameSite: "strict",
+      maxAge: 24 * 60 * 60 * 1000,
+    });
 
     res.status(200).json({
       message: "Login successful",
-      token,
     });
   } catch (error) {
     res.status(500).json({ message: "Server error" });

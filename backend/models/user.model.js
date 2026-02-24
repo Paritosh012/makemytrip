@@ -33,11 +33,6 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-userSchema.pre("validate", function (next) {
-  if (this.role === "SUPER_ADMIN" && this.tenantId) {
-    return next(new Error("SUPER_ADMIN cannot have tenantId"));
-  }
-  next();
-});
+ 
 
 module.exports = mongoose.model("User", userSchema);
