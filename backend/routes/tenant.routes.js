@@ -1,13 +1,29 @@
 const express = require("express");
 const router = express.Router();
-
-const { createTenant } = require("../controllers/tenant.controller");
 const authMiddleware = require("../middlewares/auth.middleware");
+const tenantMiddleware = require("../middlewares/tenant.middleware");
+const roleMiddleware = require("../middlewares/role.middleware");
+const subscriptionMiddleware = require("../middlewares/subscription.middleware");
 
-router.post(
-  "/create",
+// SUPER_ADMIN – list tenants
+router.get("/", authMiddleware, roleMiddleware("SUPER_ADMIN"), getAllTenants);
+
+// HOST – view own tenant
+router.get(
+  "/my-tenant",
   authMiddleware,
-  createTenant,
+  tenantMiddleware,
+  subscriptionMiddleware,
+  roleMiddleware("HOST"),
+  getMyTenant,
+);
+
+// SUPER_ADMIN – change tenant status
+router.patch(
+  "/:tenantId/status",
+  authMiddleware,
+  roleMiddleware("SUPER_ADMIN"),
+  updateTenantStatus,
 );
 
 module.exports = router;
