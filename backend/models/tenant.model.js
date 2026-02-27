@@ -5,7 +5,7 @@ const tenantSchema = new mongoose.Schema(
     name: {
       type: String,
       required: true,
-      trim: true,
+      trim: true, 
     },
     ownerId: {
       type: mongoose.Schema.Types.ObjectId,

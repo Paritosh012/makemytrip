@@ -13,7 +13,7 @@ const subscriptionSchema = new mongoose.Schema(
       required: true,
       enum: ["BASIC", "PRO", "PREMIUM"],
     },
-    maxAgents: {
+    maxAgents: { 
       type: Number,
       required: true,
     },
