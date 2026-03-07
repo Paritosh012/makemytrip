@@ -28,53 +28,32 @@ const createTenant = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(hostPassword, 10);
 
-    const [host] = await User.create(
-      [
-        {
-          name: hostName,
-          email: hostEmail.toLowerCase(),
-          password: hashedPassword,
-          role: "HOST",
-        },
-      ],
-      { session },
-    );
+    const host = await User.create({
+      name: hostName,
+      email: hostEmail.toLowerCase(),
+      password: hashedPassword,
+      role: "HOST",
+    });
 
-    const [tenant] = await Tenant.create(
-      [
-        {
-          name: tenantName,
-          ownerId: host._id,
-        },
-      ],
-      { session },
-    );
+    const tenant = await Tenant.create({
+      name: tenantName,
+      ownerId: host._id,
+    });
 
-    await User.updateOne(
-      { _id: host._id },
-      { tenantId: tenant._id },
-      { session },
-    );
+    await User.updateOne({ _id: host._id }, { tenantId: tenant._id });
 
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + 1);
 
-    await Subscription.create(
-      [
-        {
-          tenantId: tenant._id,
-          planName: normalizedPlan,
-          maxAgents: planConfig.maxAgents,
-          maxBookingsPerMonth: planConfig.maxBookingsPerMonth,
-          startDate,
-          endDate,
-        },
-      ],
-      { session },
-    );
-
-    await session.commitTransaction();
+    await Subscription.create({
+      tenantId: tenant._id,
+      planName: normalizedPlan,
+      maxAgents: planConfig.maxAgents,
+      maxBookingsPerMonth: planConfig.maxBookingsPerMonth,
+      startDate,
+      endDate,
+    });
 
     return res.status(201).json({
       message: "Tenant created successfully",
@@ -83,14 +62,26 @@ const createTenant = async (req, res) => {
       plan: normalizedPlan,
     });
   } catch (error) {
-    await session.abortTransaction();
-
     return res.status(500).json({
       message: error.message || "Tenant provisioning failed",
     });
-  } finally {
-    session.endSession();
   }
 };
 
-module.exports = { createTenant };
+const getTenants = async (req, res) => {
+  try {
+    const tenants = await Tenant.find().populate("ownerId", "name email");
+
+    res.status(200).json({
+      message: "Tenants fetched successfully",
+      tenants,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch tenants",
+      error: error.message,
+    });
+  }
+};
+
+module.exports = { createTenant, getTenants };
