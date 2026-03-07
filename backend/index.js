@@ -7,10 +7,19 @@ const authRoutes = require("./routes/auth.routes");
 const tenantRoutes = require("./routes/tenant.routes");
 const cookieParser = require("cookie-parser");
 
+const rateLimit = require("express-rate-limit");
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+
+const errorMiddleware = require("./middlewares/error.middleware");
+
 const connectDB = require("./config/db");
 
 const app = express();
 
+app.use(limiter);
 app.use(helmet());
 app.use(cookieParser());
 app.use(
@@ -19,7 +28,7 @@ app.use(
     credentials: true,
   }),
 );
-
+app.use(errorMiddleware);
 app.use(express.json({ limit: "10kb" }));
 
 app.get("/health", (req, res) => {

@@ -13,85 +13,83 @@ const createTenant = async (req, res) => {
     return res.status(400).json({ message: "All fields are required" });
   }
 
-  const planConfig = PLANS[planName];
+  const normalizedPlan = planName.toUpperCase();
+  const planConfig = PLANS[normalizedPlan];
+
   if (!planConfig) {
     return res.status(400).json({ message: "Invalid subscription plan" });
   }
 
   try {
-    const existingUser = await User.findOne({ email: hostEmail });
+    const existingUser = await User.findOne({ email: hostEmail.toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({ message: "Host email already exists" });
+      throw new Error("Host email already exists");
     }
 
     const hashedPassword = await bcrypt.hash(hostPassword, 10);
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    const [host] = await User.create(
+      [
+        {
+          name: hostName,
+          email: hostEmail.toLowerCase(),
+          password: hashedPassword,
+          role: "HOST",
+        },
+      ],
+      { session },
+    );
 
-    try {
-      const [host] = await User.create(
-        [
-          {
-            name: hostName,
-            email: hostEmail,
-            password: hashedPassword,
-            role: "HOST",
-          },
-        ],
-        { session },
-      );
+    const [tenant] = await Tenant.create(
+      [
+        {
+          name: tenantName,
+          ownerId: host._id,
+        },
+      ],
+      { session },
+    );
 
-      const [tenant] = await Tenant.create(
-        [
-          {
-            name: tenantName,
-            ownerId: host._id,
-          },
-        ],
-        { session },
-      );
+    await User.updateOne(
+      { _id: host._id },
+      { tenantId: tenant._id },
+      { session },
+    );
 
-      await User.updateOne(
-        { _id: host._id },
-        { tenantId: tenant._id },
-        { session },
-      );
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 1);
 
-      const startDate = new Date();
-      const endDate = new Date(startDate);
-      endDate.setMonth(endDate.getMonth() + 1);
+    await Subscription.create(
+      [
+        {
+          tenantId: tenant._id,
+          planName: normalizedPlan,
+          maxAgents: planConfig.maxAgents,
+          maxBookingsPerMonth: planConfig.maxBookingsPerMonth,
+          startDate,
+          endDate,
+        },
+      ],
+      { session },
+    );
 
-      const [subscription] = await Subscription.create(
-        [
-          {
-            tenantId: tenant._id,
-            planName: planName,
-            maxAgents: planConfig.maxAgents,
-            maxBookingsPerMonth: planConfig.maxBookingsPerMonth,
-            startDate,
-            endDate,
-          },
-        ],
-        { session },
-      );
+    await session.commitTransaction();
 
-      await session.commitTransaction();
-      session.endSession();
-
-      return res.status(201).json({
-        message: "Tenant created successfully",
-        tenantId: tenant._id,
-        hostId: host._id,
-        plan: planName,
-      });
-    } catch (error) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(500).json({ message: "Tenant provisioning failed" });
-    }
+    return res.status(201).json({
+      message: "Tenant created successfully",
+      tenantId: tenant._id,
+      hostId: host._id,
+      plan: normalizedPlan,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    await session.abortTransaction();
+
+    return res.status(500).json({
+      message: error.message || "Tenant provisioning failed",
+    });
+  } finally {
+    session.endSession();
   }
 };
 

@@ -41,7 +41,11 @@ const login = async (req, res) => {
       return res.status(400).json({ message: "Email and password required" });
     }
 
-    const user = await User.findOne({ email }).select("+password");
+    const normalizedEmail = email.toLowerCase();
+
+    const user = await User.findOne({ email: normalizedEmail }).select(
+      "+password",
+    );
 
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
@@ -65,8 +69,8 @@ const login = async (req, res) => {
 
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", 
-      sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
       maxAge: 24 * 60 * 60 * 1000,
     });
 
