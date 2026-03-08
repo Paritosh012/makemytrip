@@ -11,7 +11,7 @@ const {
   activateTenant,
   getOneTenant,
   updateTenantPlan,
-} = require("../controllers/tenant.controller");
+} = require("../controllers/platformAdmin.controller");
 
 // SUPER_ADMIN –
 
