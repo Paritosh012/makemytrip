@@ -4,7 +4,7 @@ const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
 const authRoutes = require("./routes/auth.routes");
-const tenantRoutes = require("./routes/tenant.routes");
+const platformAdminRoutes = require("./routes/platformAdmin.routes");
 const cookieParser = require("cookie-parser");
 
 const rateLimit = require("express-rate-limit");
@@ -28,7 +28,6 @@ app.use(
     credentials: true,
   }),
 );
-app.use(errorMiddleware);
 app.use(express.json({ limit: "10kb" }));
 
 app.get("/health", (req, res) => {
@@ -38,7 +37,9 @@ app.get("/health", (req, res) => {
   });
 });
 app.use("/api/auth", authRoutes);
-app.use("/api/tenants", tenantRoutes);
+app.use("/api/tenants", platformAdminRoutes);
+
+app.use(errorMiddleware);
 
 const PORT = process.env.PORT;
 

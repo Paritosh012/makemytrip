@@ -98,6 +98,8 @@ const suspendTenant = async (req, res) => {
   try {
     const { tenantId } = req.params;
 
+    
+
     const tenant = await Tenant.findByIdAndUpdate(
       tenantId,
       { status: "SUSPENDED" },
