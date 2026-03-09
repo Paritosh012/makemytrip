@@ -5,6 +5,7 @@ const helmet = require("helmet");
 const cors = require("cors");
 const authRoutes = require("./routes/auth.routes");
 const platformAdminRoutes = require("./routes/platformAdmin.routes");
+const packageRoutes = require("./routes/package.routes.js");
 const cookieParser = require("cookie-parser");
 
 const rateLimit = require("express-rate-limit");
@@ -36,8 +37,15 @@ app.get("/health", (req, res) => {
     environment: process.env.NODE_ENV || "development",
   });
 });
+
+// AUTH ROUTES
 app.use("/api/auth", authRoutes);
+
+// SUPER ADMIN ROUTES
 app.use("/api/tenants", platformAdminRoutes);
+
+// HOST ROUTES
+app.use("/api/packages", packageRoutes);
 
 app.use(errorMiddleware);
 

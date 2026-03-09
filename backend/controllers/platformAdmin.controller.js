@@ -9,9 +9,9 @@ const createTenant = async (req, res) => {
   const { tenantName, hostName, hostEmail, hostPassword, planName } = req.body;
 
   if (!tenantName || !hostName || !hostEmail || !hostPassword || !planName) {
-    return res.status(400).json({
-      message: "All fields are required",
-    });
+    return res
+      .status(400)
+      .json({ success: false, message: "All fields are required" });
   }
 
   const normalizedEmail = hostEmail.toLowerCase();
@@ -19,18 +19,18 @@ const createTenant = async (req, res) => {
   const planConfig = PLANS[normalizedPlan];
 
   if (!planConfig) {
-    return res.status(400).json({
-      message: "Invalid subscription plan",
-    });
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid subscription plan" });
   }
 
   try {
     const existingUser = await User.findOne({ email: normalizedEmail });
 
     if (existingUser) {
-      return res.status(400).json({
-        message: "Host email already exists",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Host email already exists" });
     }
 
     const hashedPassword = await bcrypt.hash(hostPassword, 10);
@@ -63,6 +63,7 @@ const createTenant = async (req, res) => {
     });
 
     return res.status(201).json({
+      success: true,
       message: "Tenant created successfully",
       data: {
         tenantId: tenant._id,
@@ -72,6 +73,7 @@ const createTenant = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({
+      success: false,
       message: "Tenant provisioning failed",
       error: error.message,
     });
@@ -83,11 +85,13 @@ const getTenants = async (req, res) => {
     const tenants = await Tenant.find().populate("ownerId", "name email");
 
     return res.status(200).json({
+      success: true,
       message: "Tenants fetched successfully",
       data: tenants,
     });
   } catch (error) {
     return res.status(500).json({
+      success: false,
       message: "Failed to fetch tenants",
       error: error.message,
     });
@@ -98,8 +102,6 @@ const suspendTenant = async (req, res) => {
   try {
     const { tenantId } = req.params;
 
-    
-
     const tenant = await Tenant.findByIdAndUpdate(
       tenantId,
       { status: "SUSPENDED" },
@@ -107,17 +109,19 @@ const suspendTenant = async (req, res) => {
     );
 
     if (!tenant) {
-      return res.status(404).json({
-        message: "Tenant not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Tenant not found" });
     }
 
     res.status(200).json({
+      success: true,
       message: "Tenant successfully suspended",
-      tenant,
+      data: tenant,
     });
   } catch (error) {
     res.status(500).json({
+      success: false,
       message: "Failed to suspend tenant",
       error: error.message,
     });
@@ -135,17 +139,19 @@ const activateTenant = async (req, res) => {
     );
 
     if (!tenant) {
-      return res.status(404).json({
-        message: "Tenant not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Tenant not found" });
     }
 
     res.status(200).json({
+      success: true,
       message: "Tenant successfully activated",
-      tenant,
+      data: tenant,
     });
   } catch (error) {
     res.status(500).json({
+      success: false,
       message: "Failed to activate tenant",
       error: error.message,
     });
@@ -161,9 +167,9 @@ const getOneTenant = async (req, res) => {
     );
 
     if (!tenant) {
-      return res.status(404).json({
-        message: "Tenant not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Tenant not found" });
     }
 
     const subscription = await Subscription.findOne({ tenantId });
@@ -175,12 +181,16 @@ const getOneTenant = async (req, res) => {
     }
 
     res.status(200).json({
+      success: true,
       message: "Tenant successfully fetched",
-      tenant,
-      subscription,
+      data: {
+        tenant,
+        subscription,
+      },
     });
   } catch (error) {
     res.status(500).json({
+      success: false,
       message: "Failed to fetch tenant",
       error: error.message,
     });
@@ -193,18 +203,16 @@ const updateTenantPlan = async (req, res) => {
     const { planName } = req.body;
 
     if (!planName) {
-      return res.status(400).json({
-        message: "Plan name is required",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Plan name is required" });
     }
 
     const normalizePlan = planName.toUpperCase();
     const configPlan = PLANS[normalizePlan];
 
     if (!configPlan) {
-      return res.status(400).json({
-        message: "Invalid plan",
-      });
+      return res.status(400).json({ success: false, message: "Invalid plan" });
     }
 
     const subscription = await Subscription.findOneAndUpdate(
@@ -218,20 +226,24 @@ const updateTenantPlan = async (req, res) => {
     );
 
     if (!subscription) {
-      return res.status(404).json({
-        message: "Subscription not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Subscription not found" });
     }
 
     res.status(200).json({
+      success: true,
       message: "Tenant plan updated successfully",
-      subscription,
+      data: subscription,
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Failed to update plan",
-      error: error.message,
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to update plan",
+        error: error.message,
+      });
   }
 };
 
