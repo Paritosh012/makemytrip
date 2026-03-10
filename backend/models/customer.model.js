@@ -33,6 +33,12 @@ const customerSchema = new mongoose.Schema(
       trim: true,
     },
 
+    status: {
+      type: String,
+      enum: ["ACTIVE", "ARCHIVED"],
+      default: "ACTIVE",
+    },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
