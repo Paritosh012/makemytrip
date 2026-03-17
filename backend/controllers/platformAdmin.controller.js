@@ -1,257 +1,242 @@
-const bcrypt = require("bcrypt");
+const mongoose = require("mongoose");
 
-const User = require("../models/user.model");
 const Tenant = require("../models/tenant.model");
 const Subscription = require("../models/subscription.model");
+
 const PLANS = require("../config/plan.config");
 
-const createTenant = async (req, res) => {
-  const { tenantName, hostName, hostEmail, hostPassword, planName } = req.body;
-
-  if (!tenantName || !hostName || !hostEmail || !hostPassword || !planName) {
-    return res
-      .status(400)
-      .json({ success: false, message: "All fields are required" });
-  }
-
-  const normalizedEmail = hostEmail.toLowerCase();
-  const normalizedPlan = planName.toUpperCase();
-  const planConfig = PLANS[normalizedPlan];
-
-  if (!planConfig) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Invalid subscription plan" });
-  }
-
-  try {
-    const existingUser = await User.findOne({ email: normalizedEmail });
-
-    if (existingUser) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Host email already exists" });
-    }
-
-    const hashedPassword = await bcrypt.hash(hostPassword, 10);
-
-    const host = await User.create({
-      name: hostName,
-      email: normalizedEmail,
-      password: hashedPassword,
-      role: "HOST",
-    });
-
-    const tenant = await Tenant.create({
-      name: tenantName,
-      ownerId: host._id,
-    });
-
-    await User.updateOne({ _id: host._id }, { tenantId: tenant._id });
-
-    const startDate = new Date();
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + 1);
-
-    await Subscription.create({
-      tenantId: tenant._id,
-      planName: normalizedPlan,
-      maxAgents: planConfig.maxAgents,
-      maxBookingsPerMonth: planConfig.maxBookingsPerMonth,
-      startDate,
-      endDate,
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "Tenant created successfully",
-      data: {
-        tenantId: tenant._id,
-        hostId: host._id,
-        plan: normalizedPlan,
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Tenant provisioning failed",
-      error: error.message,
-    });
-  }
-};
-
+/*
+-------------------------------------------------------
+GET ALL TENANTS
+SUPER_ADMIN
+-------------------------------------------------------
+*/
 const getTenants = async (req, res) => {
   try {
-    const tenants = await Tenant.find().populate("ownerId", "name email");
+    const tenants = await Tenant.find()
+      .populate("ownerId", "name email")
+      .lean();
 
     return res.status(200).json({
       success: true,
-      message: "Tenants fetched successfully",
       data: tenants,
     });
   } catch (error) {
+    console.error("getTenants error:", error);
+
     return res.status(500).json({
       success: false,
       message: "Failed to fetch tenants",
-      error: error.message,
     });
   }
 };
 
+/*
+-------------------------------------------------------
+SUSPEND TENANT
+SUPER_ADMIN
+-------------------------------------------------------
+*/
 const suspendTenant = async (req, res) => {
   try {
     const { tenantId } = req.params;
 
+    if (!mongoose.Types.ObjectId.isValid(tenantId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid tenant ID",
+      });
+    }
+
     const tenant = await Tenant.findByIdAndUpdate(
       tenantId,
       { status: "SUSPENDED" },
-      { new: true },
+      { new: true }
     );
 
     if (!tenant) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Tenant not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Tenant not found",
+      });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: "Tenant successfully suspended",
       data: tenant,
     });
   } catch (error) {
-    res.status(500).json({
+    console.error("suspendTenant error:", error);
+
+    return res.status(500).json({
       success: false,
       message: "Failed to suspend tenant",
-      error: error.message,
     });
   }
 };
 
+/*
+-------------------------------------------------------
+ACTIVATE TENANT
+SUPER_ADMIN
+-------------------------------------------------------
+*/
 const activateTenant = async (req, res) => {
   try {
     const { tenantId } = req.params;
 
+    if (!mongoose.Types.ObjectId.isValid(tenantId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid tenant ID",
+      });
+    }
+
     const tenant = await Tenant.findByIdAndUpdate(
       tenantId,
       { status: "ACTIVE" },
-      { new: true },
+      { new: true }
     );
 
     if (!tenant) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Tenant not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Tenant not found",
+      });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: "Tenant successfully activated",
       data: tenant,
     });
   } catch (error) {
-    res.status(500).json({
+    console.error("activateTenant error:", error);
+
+    return res.status(500).json({
       success: false,
       message: "Failed to activate tenant",
-      error: error.message,
     });
   }
 };
 
+/*
+-------------------------------------------------------
+GET SINGLE TENANT
+SUPER_ADMIN
+-------------------------------------------------------
+*/
 const getOneTenant = async (req, res) => {
   try {
     const { tenantId } = req.params;
-    const tenant = await Tenant.findById(tenantId).populate(
-      "ownerId",
-      "name email",
-    );
 
-    if (!tenant) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Tenant not found" });
-    }
-
-    const subscription = await Subscription.findOne({ tenantId });
-
-    if (!subscription) {
-      return res.status(404).json({
-        message: "Subscription not found",
+    if (!mongoose.Types.ObjectId.isValid(tenantId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid tenant ID",
       });
     }
 
-    res.status(200).json({
+    const tenant = await Tenant.findById(tenantId)
+      .populate("ownerId", "name email")
+      .lean();
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        message: "Tenant not found",
+      });
+    }
+
+    const subscription = await Subscription.findOne({ tenantId }).lean();
+
+    return res.status(200).json({
       success: true,
-      message: "Tenant successfully fetched",
       data: {
         tenant,
         subscription,
       },
     });
   } catch (error) {
-    res.status(500).json({
+    console.error("getOneTenant error:", error);
+
+    return res.status(500).json({
       success: false,
       message: "Failed to fetch tenant",
-      error: error.message,
     });
   }
 };
 
+/*
+-------------------------------------------------------
+UPDATE TENANT PLAN
+SUPER_ADMIN
+-------------------------------------------------------
+*/
 const updateTenantPlan = async (req, res) => {
   try {
     const { tenantId } = req.params;
     const { planName } = req.body;
 
     if (!planName) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Plan name is required" });
+      return res.status(400).json({
+        success: false,
+        message: "Plan name is required",
+      });
     }
 
-    const normalizePlan = planName.toUpperCase();
-    const configPlan = PLANS[normalizePlan];
+    if (!mongoose.Types.ObjectId.isValid(tenantId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid tenant ID",
+      });
+    }
 
-    if (!configPlan) {
-      return res.status(400).json({ success: false, message: "Invalid plan" });
+    const normalizedPlan = planName.toUpperCase();
+    const planConfig = PLANS[normalizedPlan];
+
+    if (!planConfig) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid plan",
+      });
     }
 
     const subscription = await Subscription.findOneAndUpdate(
       { tenantId },
       {
-        planName: normalizePlan,
-        maxAgents: configPlan.maxAgents,
-        maxBookingsPerMonth: configPlan.maxBookingsPerMonth,
+        planName: normalizedPlan,
+        maxAgents: planConfig.maxAgents,
+        maxBookingsPerMonth: planConfig.maxBookingsPerMonth,
       },
-      { new: true },
+      { new: true }
     );
 
     if (!subscription) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Subscription not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Subscription not found",
+      });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: "Tenant plan updated successfully",
       data: subscription,
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to update plan",
-        error: error.message,
-      });
+    console.error("updateTenantPlan error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update tenant plan",
+    });
   }
 };
 
 module.exports = {
-  createTenant,
   getTenants,
   suspendTenant,
   activateTenant,
   getOneTenant,
   updateTenantPlan,
 };
+ 

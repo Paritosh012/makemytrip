@@ -5,7 +5,6 @@ const authMiddleware = require("../middlewares/auth.middleware");
 const roleMiddleware = require("../middlewares/role.middleware");
 
 const {
-  createTenant,
   getTenants,
   suspendTenant,
   activateTenant,
@@ -13,15 +12,15 @@ const {
   updateTenantPlan,
 } = require("../controllers/platformAdmin.controller");
 
-// SUPER_ADMIN –
-
-// create tenant
-router.post("/", authMiddleware, roleMiddleware("SUPER_ADMIN"), createTenant);
-
-// get all tenants
 router.get("/", authMiddleware, roleMiddleware("SUPER_ADMIN"), getTenants);
 
-//suspend tenant
+router.get(
+  "/:tenantId",
+  authMiddleware,
+  roleMiddleware("SUPER_ADMIN"),
+  getOneTenant,
+);
+
 router.patch(
   "/:tenantId/suspend",
   authMiddleware,
@@ -29,21 +28,11 @@ router.patch(
   suspendTenant,
 );
 
-//activate tenant
 router.patch(
   "/:tenantId/activate",
   authMiddleware,
   roleMiddleware("SUPER_ADMIN"),
   activateTenant,
-);
-
-//get one tenant
-
-router.get(
-  "/:tenantId",
-  authMiddleware,
-  roleMiddleware("SUPER_ADMIN"),
-  getOneTenant,
 );
 
 router.patch(
