@@ -14,34 +14,72 @@ END USER SUBMIT APPLICATION
 */
 const submitApplication = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const { userId } = req.user;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (user.role !== "END_USER") {
+      return res.status(403).json({
+        success: false,
+        message: "Only end users can apply",
+      });
+    }
+
+    if (user.tenantId) {
+      return res.status(400).json({
+        success: false,
+        message: "User already owns a tenant",
+      });
+    }
 
     const { agencyName, businessEmail, phone, description } = req.body;
 
-    const existing = await HostApplication.findOne({ userId });
-
-    if (existing) {
+    if (!agencyName || !businessEmail || !phone) {
       return res.status(400).json({
-        message: "Application already submitted",
+        success: false,
+        message: "Missing required fields",
       });
     }
 
     const application = await HostApplication.create({
       userId,
-      agencyName,
-      businessEmail,
-      phone,
+      agencyName: agencyName.trim(),
+      businessEmail: businessEmail.toLowerCase().trim(),
+      phone: phone.trim(),
       description,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
+      message: "Application successfully submited",
       data: application,
     });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Application already pending",
+      });
+    }
+
     console.error(error);
 
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       message: "Application submission failed",
     });
   }
@@ -54,18 +92,25 @@ SUPER ADMIN GET APPLICATIONS
 */
 const getApplications = async (req, res) => {
   try {
-    const applications = await HostApplication.find({
-      status: "PENDING",
-    }).populate("userId", "name email");
+    const { status } = req.query;
 
-    res.status(200).json({
+    const filter = {};
+    if (status) filter.status = status;
+
+    const applications = await HostApplication.find(filter)
+      .populate("userId", "name email")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
       success: true,
+      message: "Successfully fetched applications",
       data: applications,
     });
   } catch (error) {
     console.error(error);
 
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       message: "Failed to fetch applications",
     });
   }
@@ -78,81 +123,76 @@ SUPER ADMIN APPROVE APPLICATION
 */
 const approveApplication = async (req, res) => {
   const session = await mongoose.startSession();
-  session.startTransaction();
 
   try {
     const { applicationId } = req.params;
 
-    const application = await HostApplication.findById(applicationId).session(
-      session
-    );
+    await session.withTransaction(async () => {
+      // 🔥 STEP 1: LOCK APPLICATION (atomic)
+      const application = await HostApplication.findOneAndUpdate(
+        { _id: applicationId, status: "PENDING" },
+        { status: "PROCESSING" },
+        { new: true, session },
+      );
 
-    if (!application || application.status !== "PENDING") {
-      throw new Error("Invalid application");
-    }
+      if (!application) {
+        return res.status(400).json({
+          success: "false",
+          message: "Application already processed or not found",
+        });
+      }
 
-    const user = await User.findById(application.userId).session(session);
+      // 🔥 STEP 2: FETCH USER
+      const user = await User.findById(application.userId).session(session);
 
-    if (!user) throw new Error("User not found");
+      if (!user) {
+        return res.status(404).json({
+          success: "false",
+          message: "User not found",
+        });
+      }
 
-    if (user.role === "HOST") {
-      throw new Error("User already became host");
-    }
+      if (user.role === "HOST" || user.tenantId) {
+        return res.status(400).json({
+          success: "false",
+          message: "User already has tenant",
+        });
+      }
 
-    const tenant = await Tenant.create(
-      [
-        {
-          name: application.agencyName,
-          ownerId: user._id,
-        },
-      ],
-      { session }
-    );
+      // 🔥 STEP 3: CREATE TENANT
+      const [tenant] = await Tenant.create(
+        [
+          {
+            name: application.agencyName,
+            ownerId: user._id,
+            status: "PENDING",
+          },
+        ],
+        { session },
+      );
 
-    user.role = "HOST";
-    user.tenantId = tenant[0]._id;
+      // 🔥 STEP 4: UPDATE USER
+      user.role = "HOST";
+      user.tenantId = tenant._id;
+      await user.save({ session });
 
-    await user.save({ session });
+      // 🔥 STEP 6: FINALIZE APPLICATION
+      application.status = "APPROVED";
+      application.reviewedBy = req.user.userId;
+      application.reviewedAt = new Date();
 
-    const planConfig = PLANS.BASIC;
+      await application.save({ session });
+    });
 
-    const startDate = new Date();
-    const endDate = new Date(startDate);
-    endDate.setMonth(endDate.getMonth() + 1);
-
-    await Subscription.create(
-      [
-        {
-          tenantId: tenant[0]._id,
-          planName: "BASIC",
-          maxAgents: planConfig.maxAgents,
-          maxBookingsPerMonth: planConfig.maxBookingsPerMonth,
-          startDate,
-          endDate,
-        },
-      ],
-      { session }
-    );
-
-    application.status = "APPROVED";
-    application.reviewedBy = req.user.userId;
-    application.reviewedAt = new Date();
-
-    await application.save({ session });
-
-    await session.commitTransaction();
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Application approved",
-      tenantId: tenant[0]._id,
     });
   } catch (error) {
-    await session.abortTransaction();
-
     console.error(error);
 
-    res.status(500).json({
+    return res.status(400).json({
+      success: false,
       message: error.message,
     });
   } finally {
@@ -169,24 +209,32 @@ const rejectApplication = async (req, res) => {
   try {
     const { applicationId } = req.params;
 
-    const application = await HostApplication.findByIdAndUpdate(
-      applicationId,
+    const application = await HostApplication.findOneAndUpdate(
+      { _id: applicationId, status: "PENDING" },
       {
         status: "REJECTED",
         reviewedBy: req.user.userId,
         reviewedAt: new Date(),
       },
-      { new: true }
+      { new: true },
     );
 
-    res.status(200).json({
+    if (!application) {
+      return res.status(400).json({
+        success: false,
+        message: "Application already processed or not found",
+      });
+    }
+
+    return res.status(200).json({
       success: true,
       data: application,
     });
   } catch (error) {
     console.error(error);
 
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       message: "Reject failed",
     });
   }

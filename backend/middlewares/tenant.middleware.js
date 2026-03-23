@@ -18,7 +18,9 @@ const tenantStatusMiddleware = async (req, res, next) => {
     }
 
     if (tenant.status !== "ACTIVE") {
-      return res.status(403).json({ message: "Tenant is suspended" });
+      return res.status(403).json({
+        message: "Tenant not activated. Please purchase a plan.",
+      });
     }
 
     req.tenant = tenant;

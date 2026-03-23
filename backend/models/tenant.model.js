@@ -10,12 +10,12 @@ const tenantSchema = new mongoose.Schema(
     ownerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true, 
+      required: true,
     },
     status: {
       type: String,
-      enum: ["ACTIVE", "SUSPENDED"],
-      default: "ACTIVE",
+      enum: ["PENDING", "ACTIVE", "SUSPENDED"],
+      default: "PENDING",
     },
   },
   { timestamps: true },

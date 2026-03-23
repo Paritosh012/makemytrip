@@ -6,14 +6,13 @@ const hostApplicationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true,
     },
-
+ 
     agencyName: {
       type: String,
       required: true,
     },
-
+ 
     businessEmail: {
       type: String,
       required: true,
@@ -31,8 +30,9 @@ const hostApplicationSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["PENDING", "APPROVED", "REJECTED"],
+      enum: ["PENDING", "PROCESSING", "APPROVED", "REJECTED"],
       default: "PENDING",
+      index: true,
     },
 
     reviewedBy: {
@@ -45,6 +45,14 @@ const hostApplicationSchema = new mongoose.Schema(
     },
   },
   { timestamps: true },
+);
+
+hostApplicationSchema.index(
+  { userId: 1, status: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: "PENDING" },
+  },
 );
 
 module.exports = mongoose.model("HostApplication", hostApplicationSchema);

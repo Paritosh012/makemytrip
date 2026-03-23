@@ -12,6 +12,7 @@ const authRoutes = require("./routes/auth.routes");
 const platformAdminRoutes = require("./routes/platformAdmin.routes");
 const hostApplicationRoutes = require("./routes/host.application.routes");
 const packageRoutes = require("./routes/package.routes");
+const subscriptionRoutes = require("./routes/subscription.routes.js");
 
 const errorMiddleware = require("./middlewares/error.middleware");
 
@@ -45,6 +46,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/tenants", platformAdminRoutes);
 app.use("/api/host-applications", hostApplicationRoutes);
 app.use("/api/packages", packageRoutes);
+app.use("/api/subscription", subscriptionRoutes);
 
 app.use(errorMiddleware);
 

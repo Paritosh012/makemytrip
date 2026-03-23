@@ -1,0 +1,87 @@
+const Subscription = require("../models/subscription.model");
+const Tenant = require("../models/tenant.model");
+const PLANS = require("../config/plan.config");
+
+const purchaseSubscription = async (req, res) => {
+  try {
+    const { planName } = req.body;
+
+    // 🔥 STEP 1: VALIDATE PLAN
+    if (!planName || !PLANS[planName]) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid plan selected",
+      });
+    }
+
+    // 🔥 STEP 2: GET TENANT FROM AUTH USER (NEVER FROM BODY)
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        message: "User is not associated with any tenant",
+      });
+    }
+
+    const tenant = await Tenant.findById(tenantId);
+
+    if (!tenant) {
+      return res.status(404).json({
+        success: false,
+        message: "Tenant not found",
+      });
+    }
+
+    // 🔥 STEP 3: PREVENT DUPLICATE ACTIVE SUBSCRIPTION
+    const existing = await Subscription.findOne({
+      tenantId,
+      status: "ACTIVE",
+    });
+
+    if (existing) {
+      return res.status(400).json({
+        success: false,
+        message: "Active subscription already exists",
+      });
+    }
+
+    // 🔥 STEP 4: CREATE SUBSCRIPTION
+    const planConfig = PLANS[planName];
+
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + 1);
+
+    const subscription = await Subscription.create({
+      tenantId,
+      planName,
+      maxAgents: planConfig.maxAgents,
+      maxBookingsPerMonth: planConfig.maxBookingsPerMonth,
+      startDate,
+      endDate,
+      status: "ACTIVE",
+    });
+
+    // 🔥 STEP 5: ACTIVATE TENANT
+    tenant.status = "ACTIVE";
+    await tenant.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "Subscription activated successfully",
+      data: subscription,
+    });
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Subscription purchase failed",
+    });
+  }
+};
+
+module.exports = {
+  purchaseSubscription,
+};

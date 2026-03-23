@@ -15,10 +15,21 @@ const subscriptionMiddleware = async (req, res, next) => {
     });
 
     if (!subscription) {
-      return res.status(403).json({ message: "Subscription not found" });
+      return res.status(403).json({
+        message: "Please purchase a plan",
+      });
     }
 
     const now = new Date();
+
+    if (subscription.endDate < now) {
+      subscription.status = "EXPIRED";
+      await subscription.save();
+
+      return res.status(403).json({
+        message: "Subscription expired. Please renew.",
+      });
+    }
 
     if (subscription.endDate < now) {
       subscription.status = "EXPIRED";
