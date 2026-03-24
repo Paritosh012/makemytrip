@@ -11,3 +11,4 @@ const role = require("../middlewares/role.middleware");
 router.post("/purchase", auth, role("HOST"), purchaseSubscription);
 
 module.exports = router;
+ 

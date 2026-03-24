@@ -46,7 +46,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/tenants", platformAdminRoutes);
 app.use("/api/host-applications", hostApplicationRoutes);
 app.use("/api/packages", packageRoutes);
-app.use("/api/subscription", subscriptionRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
 
 app.use(errorMiddleware);
 

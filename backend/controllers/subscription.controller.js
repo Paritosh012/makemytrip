@@ -4,10 +4,10 @@ const PLANS = require("../config/plan.config");
 
 const purchaseSubscription = async (req, res) => {
   try {
-    const { planName } = req.body;
+    const { plan } = req.body;
 
     // 🔥 STEP 1: VALIDATE PLAN
-    if (!planName || !PLANS[planName]) {
+    if (!plan || !PLANS[plan]) {
       return res.status(400).json({
         success: false,
         message: "Invalid plan selected",
@@ -47,7 +47,7 @@ const purchaseSubscription = async (req, res) => {
     }
 
     // 🔥 STEP 4: CREATE SUBSCRIPTION
-    const planConfig = PLANS[planName];
+    const planConfig = PLANS[plan];
 
     const startDate = new Date();
     const endDate = new Date(startDate);
@@ -55,7 +55,7 @@ const purchaseSubscription = async (req, res) => {
 
     const subscription = await Subscription.create({
       tenantId,
-      planName,
+      plan,
       maxAgents: planConfig.maxAgents,
       maxBookingsPerMonth: planConfig.maxBookingsPerMonth,
       startDate,

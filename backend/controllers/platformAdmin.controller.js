@@ -51,7 +51,7 @@ const suspendTenant = async (req, res) => {
     const tenant = await Tenant.findByIdAndUpdate(
       tenantId,
       { status: "SUSPENDED" },
-      { new: true }
+      { new: true },
     );
 
     if (!tenant) {
@@ -95,7 +95,7 @@ const activateTenant = async (req, res) => {
     const tenant = await Tenant.findByIdAndUpdate(
       tenantId,
       { status: "ACTIVE" },
-      { new: true }
+      { new: true },
     );
 
     if (!tenant) {
@@ -175,9 +175,9 @@ SUPER_ADMIN
 const updateTenantPlan = async (req, res) => {
   try {
     const { tenantId } = req.params;
-    const { planName } = req.body;
+    const { plan } = req.body;
 
-    if (!planName) {
+    if (!plan) {
       return res.status(400).json({
         success: false,
         message: "Plan name is required",
@@ -191,7 +191,7 @@ const updateTenantPlan = async (req, res) => {
       });
     }
 
-    const normalizedPlan = planName.toUpperCase();
+    const normalizedPlan = plan.toUpperCase();
     const planConfig = PLANS[normalizedPlan];
 
     if (!planConfig) {
@@ -208,7 +208,7 @@ const updateTenantPlan = async (req, res) => {
         maxAgents: planConfig.maxAgents,
         maxBookingsPerMonth: planConfig.maxBookingsPerMonth,
       },
-      { new: true }
+      { new: true },
     );
 
     if (!subscription) {
@@ -239,4 +239,3 @@ module.exports = {
   getOneTenant,
   updateTenantPlan,
 };
- 
