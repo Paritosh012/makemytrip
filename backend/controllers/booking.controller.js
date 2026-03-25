@@ -1,45 +1,102 @@
-const Booking = require("../models/booking.model");
+const mongoose = require("mongoose");
+const subscriptionModel = require("../models/subscription.model");
+const packageModel = require("../models/package.model");
+const bookingModel = require("../models/booking.model");
 
 const createBooking = async (req, res) => {
+  const session = await mongoose.startSession();
+
   try {
+    session.startTransaction();
+
     const { packageId } = req.body;
+    const { userId } = req.user;
 
-    const tenantId = req.user.tenantId;
-    const userId = req.user.userId;
+    if (!mongoose.Types.ObjectId.isValid(packageId)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: "Invalid packageId",
+      });
+    }
 
-    const subscription = req.subscription;
+    const pkg = await packageModel
+      .findOne({
+        _id: packageId,
+      })
+      .session(session);
 
-    // 🔥 STEP 1: COUNT CURRENT MONTH BOOKINGS
+    if (!pkg) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: "Package not found",
+      });
+    }
+
+    const tenantId = pkg.tenantId;
+
+    const subscription = await subscriptionModel.findOne({
+      tenantId: pkg.tenantId,
+    });
+
+    if (!subscription) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(403).json({
+        success: false,
+        message: "No active subscription",
+      });
+    }
+
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const bookingCount = await Booking.countDocuments({
-      tenantId,
-      createdAt: { $gte: startOfMonth },
-    });
+    const bookingCount = await bookingModel
+      .countDocuments({
+        tenantId,
+        status: "CONFIRMED",
+        createdAt: { $gte: startOfMonth },
+      })
+      .session(session);
 
-    // 🔥 STEP 2: ENFORCE LIMIT
     if (bookingCount >= subscription.maxBookingsPerMonth) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(403).json({
         success: false,
         message: "Monthly booking limit reached",
       });
     }
 
-    // 🔥 STEP 3: CREATE BOOKING
-    const booking = await Booking.create({
-      tenantId,
-      packageId,
-      userId,
-    });
+    const booking = await bookingModel.create(
+      [
+        {
+          tenantId,
+          packageId,
+          userId,
+          status: "PENDING",
+          price: pkg.price, // ✅ FIXED
+        },
+      ],
+      { session },
+    );
+
+    await session.commitTransaction();
+    session.endSession();
 
     return res.status(201).json({
       success: true,
-      data: booking,
+      data: booking[0],
     });
   } catch (error) {
-    console.error(error);
+    await session.abortTransaction();
+    session.endSession();
+
+    console.error("Create Booking Error:", error);
 
     return res.status(500).json({
       success: false,
@@ -48,6 +105,69 @@ const createBooking = async (req, res) => {
   }
 };
 
+const cancelBooking = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { userId, role } = req.user;
+
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid bookingId",
+      });
+    }
+
+    const booking = await bookingModel.findById(bookingId);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found",
+      });
+    }
+
+    if (role === "END_USER" && booking.userId.toString() !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Not allowed to cancel this booking",
+      });
+    }
+
+    if (booking.status === "CANCELLED") {
+      return res.status(400).json({
+        success: false,
+        message: "Booking already cancelled",
+      });
+    }
+
+    if (!["PENDING", "CONFIRMED"].includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot cancel this booking",
+      });
+    }
+
+    booking.status = "CANCELLED";
+    booking.cancelledAt = new Date(); // ✅ FIXED
+
+    await booking.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Booking cancelled successfully",
+      data: booking,
+    });
+  } catch (error) {
+    console.error("Cancel Booking Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Cancel booking failed",
+    });
+  }
+};
+
 module.exports = {
   createBooking,
+  cancelBooking,
 };

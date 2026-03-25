@@ -13,6 +13,7 @@ const platformAdminRoutes = require("./routes/platformAdmin.routes");
 const hostApplicationRoutes = require("./routes/host.application.routes");
 const packageRoutes = require("./routes/package.routes");
 const subscriptionRoutes = require("./routes/subscription.routes.js");
+const bookingRoutes = require("./routes/booking.routes.js");
 
 const errorMiddleware = require("./middlewares/error.middleware");
 
@@ -32,7 +33,7 @@ app.use(
   cors({
     origin: process.env.CORS_ORIGIN,
     credentials: true,
-  })
+  }),
 );
 
 app.get("/health", (req, res) => {
@@ -47,6 +48,7 @@ app.use("/api/tenants", platformAdminRoutes);
 app.use("/api/host-applications", hostApplicationRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/bookings", bookingRoutes);
 
 app.use(errorMiddleware);
 

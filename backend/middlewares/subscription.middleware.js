@@ -2,50 +2,57 @@ const Subscription = require("../models/subscription.model");
 
 const subscriptionMiddleware = async (req, res, next) => {
   try {
-    if (req.user.role === "SUPER_ADMIN") {
+    const { role, tenantId } = req.user;
+
+    // ✅ SUPER_ADMIN bypass
+    if (role === "SUPER_ADMIN") {
       return next();
     }
 
-    if (!req.user.tenantId) {
+    // ❗ No tenant → no subscription enforcement
+    if (!tenantId) {
       return next();
     }
 
-    const subscription = await Subscription.findOne({
-      tenantId: req.user.tenantId,
-    });
+    // ✅ Fetch subscription
+    const subscription = await Subscription.findOne({ tenantId });
 
     if (!subscription) {
       return res.status(403).json({
-        message: "Please purchase a plan",
+        success: false,
+        message: "No active subscription. Please purchase a plan.",
       });
     }
 
     const now = new Date();
 
+    // ❌ Expiry check (NO DB mutation here)
     if (subscription.endDate < now) {
-      subscription.status = "EXPIRED";
-      await subscription.save();
-
       return res.status(403).json({
+        success: false,
         message: "Subscription expired. Please renew.",
       });
     }
 
-    if (subscription.endDate < now) {
-      subscription.status = "EXPIRED";
-      await subscription.save();
-
-      return res.status(403).json({ message: "Subscription expired" });
-    }
-
+    // ❌ Status check (only if you REALLY want status field)
     if (subscription.status !== "ACTIVE") {
-      return res.status(403).json({ message: "Subscription inactive" });
+      return res.status(403).json({
+        success: false,
+        message: "Subscription inactive.",
+      });
     }
 
+    // ✅ Attach for downstream usage
     req.subscription = subscription;
-    next();
+
+    return next();
   } catch (err) {
-    return res.status(500).json({ message: "Subscription validation failed" });
+    console.error("Subscription Middleware Error:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Subscription validation failed",
+    });
   }
 };
 
