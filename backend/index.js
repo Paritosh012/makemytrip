@@ -14,6 +14,7 @@ const hostApplicationRoutes = require("./routes/host.application.routes");
 const packageRoutes = require("./routes/package.routes");
 const subscriptionRoutes = require("./routes/subscription.routes.js");
 const bookingRoutes = require("./routes/booking.routes.js");
+const paymentRoutes = require("./routes/payment.routes");
 
 const errorMiddleware = require("./middlewares/error.middleware");
 
@@ -49,6 +50,7 @@ app.use("/api/host-applications", hostApplicationRoutes);
 app.use("/api/packages", packageRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/bookings", bookingRoutes);
+app.use("/api/payments", paymentRoutes);
 
 app.use(errorMiddleware);
 

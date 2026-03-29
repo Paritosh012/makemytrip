@@ -9,13 +9,7 @@ const {
 const auth = require("../middlewares/auth.middleware");
 const role = require("../middlewares/role.middleware");
 
-router.post(
-  "/",
-  auth,
-  role("END_USER"), // or HOST if needed
-
-  createBooking,
-);
+router.post("/", auth, role("END_USER"), createBooking);
 router.patch("/:bookingId/cancel", auth, role("END_USER"), cancelBooking);
 
 module.exports = router;

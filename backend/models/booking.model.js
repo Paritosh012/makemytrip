@@ -22,7 +22,7 @@ const bookingSchema = new mongoose.Schema(
       index: true,
     },
 
-    // 🔥 CRITICAL: Booking lifecycle
+    // 🔥 Booking lifecycle
     status: {
       type: String,
       enum: ["PENDING", "CONFIRMED", "CANCELLED"],
@@ -30,24 +30,48 @@ const bookingSchema = new mongoose.Schema(
       index: true,
     },
 
-    // 💰 Snapshot price (DON’T depend on package later)
+    // 💰 Price snapshot
     price: {
       type: Number,
       required: true,
     },
 
-    // 🎟️ Seat count (future-proofing)
+    // 🎟️ Seats
     seats: {
       type: Number,
       default: 1,
       min: 1,
     },
 
-    // ⏱️ Optional lifecycle timestamps
+    // 💳 Payment fields (MANDATORY)
+    razorpayOrderId: {
+      type: String,
+      index: true,
+    },
+
+    razorpayPaymentId: {
+      type: String,
+    },
+
+    paymentStatus: {
+      type: String,
+      enum: ["PENDING", "SUCCESS", "FAILED"],
+      default: "PENDING",
+      index: true,
+    },
+
+    // 🧠 Idempotency / control
+    isPaymentVerified: {
+      type: Boolean,
+      default: false,
+    },
+
+    // ⏱️ Lifecycle timestamps
     cancelledAt: Date,
     confirmedAt: Date,
+    paymentVerifiedAt: Date,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Booking", bookingSchema);
