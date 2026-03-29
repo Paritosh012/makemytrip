@@ -91,12 +91,12 @@ const verifyPayment = async (req, res) => {
       .update(razorpay_order_id + "|" + razorpay_payment_id)
       .digest("hex");
 
-    // if (expected !== razorpay_signature) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Invalid payment",
-    //   });
-    // }
+    if (expected !== razorpay_signature) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment",
+      });
+    }
 
     // confirm booking
     await confirmBookingInternal(booking._id);
