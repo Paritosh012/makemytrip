@@ -23,7 +23,7 @@ const confirmBookingInternal = async (bookingId) => {
       {
         $inc: { seatsAvailable: -1 },
       },
-      { new: true, session }
+      { new: true, session },
     );
 
     if (!pkg) {
@@ -46,7 +46,6 @@ const confirmBookingInternal = async (bookingId) => {
     throw err;
   }
 };
-
 
 module.exports = {
   confirmBookingInternal,
