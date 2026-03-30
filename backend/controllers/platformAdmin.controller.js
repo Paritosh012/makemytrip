@@ -209,7 +209,7 @@ const updateTenantPlan = async (req, res) => {
     const subscription = await Subscription.findOneAndUpdate(
       { tenantId },
       {
-        planName: normalizedPlan,
+        plan: normalizedPlan,
         maxAgents: planConfig.maxAgents,
         maxBookingsPerMonth: planConfig.maxBookingsPerMonth,
       },
