@@ -1,10 +1,11 @@
+// models/user.model.js
+
 const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: true,
       trim: true,
     },
     email: {
@@ -16,23 +17,24 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
-      select: false,
+      select: false, // only fetched when explicitly needed
+    },
+    isVerified: {
+      type: Boolean,
+      default: false,
     },
     role: {
       type: String,
       enum: ["SUPER_ADMIN", "HOST", "END_USER"],
-      required: true,
+      default: "END_USER",
     },
     tenantId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Tenant",
       default: null,
-    }, 
+    },
   },
   { timestamps: true },
 );
-
- 
 
 module.exports = mongoose.model("User", userSchema);

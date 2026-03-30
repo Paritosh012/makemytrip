@@ -1,44 +1,126 @@
+// controllers/auth.controller.js
+
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const User = require("../models/user.model");
 
+const User = require("../models/user.model");
+const OTP = require("../models/otp.model");
+
+const { generateOtp, hashOtp } = require("../utils/otp.utils");
+
+// ================= REGISTER =================
 const register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email } = req.body;
 
-    if (!name || !email || !password) {
+    if (!name || !email) {
       return res.status(400).json({ message: "All fields required" });
     }
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "Email already exists" });
+    const normalizedEmail = email.toLowerCase();
+
+    let user = await User.findOne({ email: normalizedEmail });
+
+    if (user && user.isVerified) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email already exists" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    if (!user) {
+      user = await User.create({
+        name,
+        email: normalizedEmail,
+      });
+    } else {
+      // optional: update name if user retries
+      if (name) user.name = name;
+      await user.save();
+    }
 
-    const user = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role: "END_USER",
-    });
+    const otp = generateOtp();
+    const otpHash = await hashOtp(otp);
 
-    res.status(201).json({
-      message: "User registered successfully",
-      userId: user._id,
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    await OTP.findOneAndUpdate(
+      { userId: user._id },
+      {
+        otpHash,
+        expiresAt,
+        attempts: 0,
+      },
+      { upsert: true },
+    );
+
+    console.log("OTP:", otp);
+
+    return res.status(200).json({
+      success: true,
+      message: "OTP sent successfully",
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Register error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
   }
 };
 
+// ================= SET PASSWORD =================
+const setPassword = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email and password required" });
+    }
+
+    const normalizedEmail = email.toLowerCase();
+
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (!user || !user.isVerified) {
+      return res.status(400).json({
+        message: "User not verified",
+      });
+    }
+
+    // prevent overwriting password
+    if (user.password) {
+      return res.status(400).json({
+        message: "Password already set",
+      });
+    }
+
+    user.password = await bcrypt.hash(password, 10);
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Password set successfully",
+    });
+  } catch (error) {
+    console.error("Set password error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+
+// ================= LOGIN =================
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: "Email and password required" });
+      return res.status(400).json({
+        message: "Email and password required",
+      });
     }
 
     const normalizedEmail = email.toLowerCase();
@@ -47,14 +129,24 @@ const login = async (req, res) => {
       "+password",
     );
 
-    if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
+    if (!user || !user.isVerified) {
+      return res.status(401).json({
+        message: "Invalid credentials",
+      });
+    }
+
+    if (!user.password) {
+      return res.status(400).json({
+        message: "Password not set",
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
+      return res.status(401).json({
+        message: "Invalid credentials",
+      });
     }
 
     const token = jwt.sign(
@@ -74,20 +166,25 @@ const login = async (req, res) => {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    res.status(200).json({
+    return res.status(200).json({
+      success: true,
       message: "Login successful",
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Login error:", error);
+    return res.status(500).json({
+      message: "Server error",
+    });
   }
 };
 
+// ================= LOGOUT =================
 const logout = async (req, res) => {
   try {
     res.clearCookie("token", {
       httpOnly: true,
-      sameSite: "None",
-      secure: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
     });
 
     return res.status(200).json({
@@ -95,13 +192,17 @@ const logout = async (req, res) => {
       message: "Logged out successfully",
     });
   } catch (error) {
-    console.error("❌ Logout error:", error);
+    console.error("Logout error:", error);
     return res.status(500).json({
       success: false,
       message: "Server error during logout",
-      error: error.message,
     });
   }
 };
 
-module.exports = { register, login, logout };
+module.exports = {
+  register,
+  setPassword,
+  login,
+  logout,
+};

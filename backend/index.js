@@ -15,6 +15,7 @@ const packageRoutes = require("./routes/package.routes");
 const subscriptionRoutes = require("./routes/subscription.routes.js");
 const bookingRoutes = require("./routes/booking.routes.js");
 const paymentRoutes = require("./routes/payment.routes");
+const otpRoutes = require("./routes/otp.routes");
 
 const errorMiddleware = require("./middlewares/error.middleware");
 
@@ -51,6 +52,7 @@ app.use("/api/packages", packageRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/otp", otpRoutes);
 
 app.use(errorMiddleware);
 
