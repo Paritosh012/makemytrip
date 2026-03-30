@@ -15,6 +15,10 @@ const getTenants = async (req, res) => {
   try {
     const tenants = await Tenant.find()
       .populate("ownerId", "name email")
+      .populate(
+        "subscriptionId",
+        "plan maxAgents maxBookingsPerMonth startDate endDate status",
+      )
       .lean();
 
     return res.status(200).json({
@@ -151,6 +155,7 @@ const getOneTenant = async (req, res) => {
 
     return res.status(200).json({
       success: true,
+
       data: {
         tenant,
         subscription,

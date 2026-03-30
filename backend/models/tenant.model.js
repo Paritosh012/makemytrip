@@ -12,6 +12,12 @@ const tenantSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    subscriptionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Subscription",
+      required: true,
+      default: null,
+    },
     status: {
       type: String,
       enum: ["PENDING", "ACTIVE", "SUSPENDED"],

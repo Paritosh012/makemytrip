@@ -3,9 +3,6 @@ const mongoose = require("mongoose");
 const HostApplication = require("../models/host.application.model");
 const User = require("../models/user.model");
 const Tenant = require("../models/tenant.model");
-const Subscription = require("../models/subscription.model");
-
-const PLANS = require("../config/plan.config");
 
 /*
 --------------------------------------------
