@@ -15,7 +15,6 @@ const tenantSchema = new mongoose.Schema(
     subscriptionId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Subscription",
-      required: true,
       default: null,
     },
     status: {

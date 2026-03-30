@@ -142,6 +142,10 @@ const getOneTenant = async (req, res) => {
 
     const tenant = await Tenant.findById(tenantId)
       .populate("ownerId", "name email")
+      .populate(
+        "subscriptionId",
+        "plan maxAgents maxBookingsPerMonth startDate endDate status",
+      )
       .lean();
 
     if (!tenant) {
@@ -151,14 +155,11 @@ const getOneTenant = async (req, res) => {
       });
     }
 
-    const subscription = await Subscription.findOne({ tenantId }).lean();
-
     return res.status(200).json({
       success: true,
 
       data: {
         tenant,
-        subscription,
       },
     });
   } catch (error) {
