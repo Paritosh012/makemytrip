@@ -6,6 +6,8 @@ const OTP = require("../models/otp.model");
 
 const { generateOtp, hashOtp, compareOtp } = require("../utils/otp.utils");
 
+const { sendEmail } = require("../utils/email");
+
 // ================= REGISTER =================
 
 const register = async (req, res) => {
@@ -32,7 +34,6 @@ const register = async (req, res) => {
         email: normalizedEmail,
       });
     } else {
-      // optional: update name if user retries
       if (name) user.name = name;
       await user.save();
     }
@@ -48,12 +49,19 @@ const register = async (req, res) => {
         otpHash,
         expiresAt,
         attempts: 0,
-        lastSentAt: new Date(), // ✅ REQUIRED
+        lastSentAt: new Date(),
       },
       { upsert: true },
     );
 
-    console.log("OTP:", otp);
+    await sendEmail(
+      user.email,
+      "Your OTP Code",
+      `<h1>Verify Your Email</h1>
+       <p>Your OTP code is:</p>
+       <h2 style="color:blue;">${otp}</h2>
+       <p>This OTP expires in 5 minutes.</p>`,
+    );
 
     return res.status(200).json({
       success: true,
@@ -192,7 +200,16 @@ const resendOtp = async (req, res) => {
 
     await otpDoc.save();
 
-    console.log("Resent OTP:", otp);
+    const { sendEmail } = require("../utils/email");
+
+    await sendEmail(
+      user.email,
+      "Your OTP Code",
+      `<h1>Verify Your Email</h1>
+      <p>Your OTP code is:</p>
+      <h2 style="color:blue;">123456</h2>
+      <p>This OTP expires in 5 minutes.</p>`,
+    );
 
     return res.status(200).json({
       success: true,
