@@ -20,6 +20,13 @@ const errorMiddleware = require("./middlewares/error.middleware");
 
 const app = express();
 
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN,
+    credentials: true,
+  }),
+);
+
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -29,13 +36,6 @@ app.use(limiter);
 app.use(helmet());
 app.use(cookieParser());
 app.use(express.json({ limit: "10kb" }));
-
-app.use(
-  cors({
-    origin: process.env.CORS_ORIGIN,
-    credentials: true,
-  }),
-);
 
 app.get("/health", (req, res) => {
   res.status(200).json({

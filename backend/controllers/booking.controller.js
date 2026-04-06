@@ -211,7 +211,25 @@ const cancelBooking = async (req, res) => {
   }
 };
 
+const getBookings = async (req, res) => {
+  try {
+    const bookings = await bookingModel
+      .find({ userId: req.user._id })
+      .populate("packageId"); // 🔥 IMPORTANT
+
+    res.status(200).json({
+      success: true,
+      data: bookings,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to fetch bookings",
+    });
+  }
+};
+
 module.exports = {
   createBooking,
   cancelBooking,
+  getBookings,
 };

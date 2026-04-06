@@ -1,22 +1,21 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
-import Layout from "./Layout";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
+import { useEffect } from 'react'
+import { BrowserRouter } from 'react-router-dom'
+import { useDispatch } from 'react-redux'
+import { fetchMe } from './features/auth/authSlice'
+import AppRoutes from './routes/AppRoutes'
 
 const App = () => {
-  return (
-    <>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Login />} />
-            <Route path="login" element={<Login />} />
-            <Route path="signup" element={<Signup />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </>
-  );
-};
+  const dispatch = useDispatch()
 
-export default App;
+  useEffect(() => {
+    dispatch(fetchMe())
+  }, [dispatch])
+
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
+  )
+}
+
+export default App

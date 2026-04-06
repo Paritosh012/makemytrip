@@ -52,6 +52,18 @@ const submitApplication = async (req, res) => {
       });
     }
 
+    const existingApplication = await HostApplication.findOne({
+      userId,
+      status: { $in: ["PENDING", "PROCESSING", "APPROVED"] },
+    });
+
+    if (existingApplication) {
+      return res.status(400).json({
+        success: false,
+        message: "You have already applied",
+      });
+    }
+
     const application = await HostApplication.create({
       userId,
       agencyName: agencyName.trim(),
