@@ -247,7 +247,7 @@ const rejectApplication = async (req, res) => {
       message: "Reject failed",
     });
   }
-};
+};  
 
 module.exports = {
   submitApplication,

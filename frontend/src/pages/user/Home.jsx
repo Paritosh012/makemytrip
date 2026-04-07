@@ -1,48 +1,88 @@
-import { useEffect, useState } from 'react'
-import { useDispatch } from 'react-redux'
-import * as packageService from '../../services/package.service'
-import * as bookingService from '../../services/booking.service'
-import { setPendingBooking } from '../../features/booking/bookingSlice'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from "react";
+import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import * as packageService from "../../services/package.service";
+import * as bookingService from "../../services/booking.service";
+import { setPendingBooking } from "../../features/booking/bookingSlice";
 
-const formatDate = (d) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+const formatDate = (d) => {
+  if (!d) return "—";
+  const date = new Date(d);
+  if (isNaN(date)) return "—";
+
+  return date.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
 
 const Home = () => {
-  const dispatch = useDispatch()
-  const navigate = useNavigate()
-  const [packages, setPackages] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [bookingPkg, setBookingPkg] = useState(null)
-  const [bookingLoading, setBookingLoading] = useState(false)
-  const [bookingError, setBookingError] = useState('')
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
 
+  const [packages, setPackages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [bookingPkg, setBookingPkg] = useState(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingError, setBookingError] = useState("");
+
+  // ✅ Fetch public packages
   useEffect(() => {
-    packageService.getPackages()
-      .then((data) => setPackages(data.data || []))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
-  }, [])
+    setLoading(true);
+    setError("");
 
-  const handleBook = async (pkg) => {
-    setBookingPkg(pkg)
-    setBookingError('')
-  }
+    packageService
+      .getPublicPackages()
+      .then((res) => {
+        setPackages(res.data || []);
+      })
+      .catch((err) => {
+        setError(err.response?.data?.message || "Failed to load packages");
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
+  // ✅ Open booking modal
+  const handleBook = (pkg) => {
+    setBookingPkg(pkg);
+    setBookingError("");
+  };
+
+  // ✅ Confirm booking
   const confirmBook = async () => {
-    setBookingLoading(true)
-    setBookingError('')
+    if (!bookingPkg) return;
+
+    setBookingLoading(true);
+    setBookingError("");
+
     try {
-      const result = await bookingService.createBooking({ packageId: bookingPkg._id })
-      dispatch(setPendingBooking({ bookingId: result.data._id, pkg: bookingPkg }))
-      setBookingPkg(null)
-      navigate('/bookings')
+      const res = await bookingService.createBooking({
+        packageId: bookingPkg._id,
+      });
+
+      dispatch(
+        setPendingBooking({
+          bookingId: res.data._id,
+          pkg: bookingPkg,
+        }),
+      );
+
+      setBookingPkg(null);
+
+      // 👉 Move to booking page (payment next)
+      navigate("/bookings");
     } catch (err) {
-      setBookingError(err.message)
+      console.log("BOOKING ERROR:", err.response?.data);
+      setBookingError(
+        err.response?.data?.message || err.message || "Booking failed",
+      );
     } finally {
-      setBookingLoading(false)
+      setBookingLoading(false);
     }
-  }
+  };
 
   return (
     <div>
@@ -54,11 +94,13 @@ const Home = () => {
       {error && <div className="alert alert-error">{error}</div>}
 
       {loading ? (
-        <div className="loader-wrap"><div className="spinner" /></div>
+        <div className="loader-wrap">
+          <div className="spinner" />
+        </div>
       ) : packages.length === 0 ? (
         <div className="empty-state">
           <div className="icon">✈</div>
-          <p>No packages available yet. Check back soon!</p>
+          <p>No packages available yet</p>
         </div>
       ) : (
         <div className="grid-3">
@@ -67,37 +109,45 @@ const Home = () => {
               <div
                 style={{
                   height: 140,
-                  background: `linear-gradient(135deg, #1a1a40 0%, #0f1a2e 100%)`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  background:
+                    "linear-gradient(135deg, #1a1a40 0%, #0f1a2e 100%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   fontSize: 40,
                 }}
               >
                 ✈
               </div>
+
               <div className="pkg-card-body">
                 <h3>{pkg.title}</h3>
-                <div className="text-muted" style={{ fontSize: 13, marginBottom: 8 }}>
+
+                <div className="text-muted" style={{ fontSize: 13 }}>
                   📍 {pkg.destination}
                 </div>
-                <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
+
+                <p style={{ fontSize: 13, color: "var(--muted)" }}>
                   {pkg.description?.slice(0, 80)}...
                 </p>
+
                 <div className="pkg-meta">
-                  <span className="pkg-meta-item">🗓 {formatDate(pkg.startDate)}</span>
-                  <span className="pkg-meta-item">→ {formatDate(pkg.endDate)}</span>
-                  <span className="pkg-meta-item">💺 {pkg.seatsAvailable} seats</span>
+                  Starting Date : <span> {formatDate(pkg.startDate)}</span>
+                  <span>💺 {pkg.seatsAvailable} seats</span>
                 </div>
-                <div className="flex-between" style={{ marginTop: 16 }}>
-                  <div className="pkg-price">₹{pkg.price?.toLocaleString('en-IN')}<span>/person</span></div>
+
+                <div className="flex-between" style={{ marginTop: 12 }}>
+                  <div className="pkg-price">
+                    ₹{pkg.price?.toLocaleString("en-IN")}
+                    <span>/person</span>
+                  </div>
+
                   <button
                     className="btn btn-primary btn-sm"
-                    style={{ width: 'auto' }}
                     disabled={pkg.seatsAvailable === 0}
                     onClick={() => handleBook(pkg)}
                   >
-                    {pkg.seatsAvailable === 0 ? 'Full' : 'Book Now'}
+                    {pkg.seatsAvailable === 0 ? "Full" : "Book Now"}
                   </button>
                 </div>
               </div>
@@ -106,30 +156,43 @@ const Home = () => {
         </div>
       )}
 
-      {/* Booking confirmation modal */}
+      {/* ✅ Booking Modal */}
       {bookingPkg && (
         <div className="modal-overlay" onClick={() => setBookingPkg(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>Confirm Booking</h2>
-            <div className="card" style={{ marginBottom: 20 }}>
-              <div style={{ fontWeight: 600, marginBottom: 8 }}>{bookingPkg.title}</div>
-              <div className="text-muted">📍 {bookingPkg.destination}</div>
-              <div style={{ marginTop: 12 }}>
-                <span className="pkg-price">₹{bookingPkg.price?.toLocaleString('en-IN')}</span>
-              </div>
+
+            <div className="card">
+              <h3>{bookingPkg.title}</h3>
+              <p>📍 {bookingPkg.destination}</p>
+              <p>₹{bookingPkg.price?.toLocaleString("en-IN")}</p>
             </div>
-            {bookingError && <div className="alert alert-error">{bookingError}</div>}
+
+            {bookingError && (
+              <div className="alert alert-error">{bookingError}</div>
+            )}
+
             <div className="actions-row">
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={confirmBook} disabled={bookingLoading}>
-                {bookingLoading ? 'Booking...' : 'Confirm & Proceed to Payment'}
+              <button
+                className="btn btn-primary"
+                onClick={confirmBook}
+                disabled={bookingLoading}
+              >
+                {bookingLoading ? "Processing..." : "Confirm & Continue"}
               </button>
-              <button className="btn btn-secondary" onClick={() => setBookingPkg(null)}>Cancel</button>
+
+              <button
+                className="btn btn-secondary"
+                onClick={() => setBookingPkg(null)}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
       )}
     </div>
-  )
-}
+  );
+};
 
-export default Home
+export default Home;

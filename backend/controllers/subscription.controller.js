@@ -82,6 +82,44 @@ const purchaseSubscription = async (req, res) => {
   }
 };
 
+const getMySubscription = async (req, res) => {
+  try {
+    const tenantId = req.user.tenantId;
+
+    if (!tenantId) {
+      return res.status(400).json({
+        success: false,
+        message: "No tenant associated",
+      });
+    }
+
+    const subscription = await Subscription.findOne({
+      tenantId,
+      status: "ACTIVE",
+    });
+
+    if (!subscription) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: subscription,
+    });
+  } catch (error) {
+    console.error("GET SUBSCRIPTION ERROR:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch subscription",
+    });
+  }
+};
+
 module.exports = {
   purchaseSubscription,
+  getMySubscription,
 };

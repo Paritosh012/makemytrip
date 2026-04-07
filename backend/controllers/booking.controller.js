@@ -36,10 +36,29 @@ const createBooking = async (req, res) => {
       });
     }
 
+    if (pkg.status !== "ACTIVE") {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: "Package is not available",
+      });
+    }
+
+    if (pkg.seatsAvailable <= 0) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: "No seats available",
+      });
+    }
+
     const tenantId = pkg.tenantId;
 
     const subscription = await subscriptionModel.findOne({
       tenantId: pkg.tenantId,
+      status: "ACTIVE",
     });
 
     if (!subscription) {
@@ -84,6 +103,9 @@ const createBooking = async (req, res) => {
       ],
       { session },
     );
+
+    pkg.seatsAvailable -= 1;
+    await pkg.save({ session });
 
     await session.commitTransaction();
     session.endSession();

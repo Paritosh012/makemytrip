@@ -49,8 +49,8 @@ const packageSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["DRAFT", "ACTIVE", "ARCHIVED"],
-      default: "DRAFT",
+      enum: ["ACTIVE", "ARCHIVED"],
+      default: "ACTIVE",
     },
   },
   { timestamps: true },

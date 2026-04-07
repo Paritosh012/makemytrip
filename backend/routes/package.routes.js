@@ -12,7 +12,10 @@ const {
   getPackage,
   updatePackage,
   deletePackage,
+  getPublicPackages,
 } = require("../controllers/package.controller");
+
+router.get("/public", getPublicPackages);
 
 router.post(
   "/",

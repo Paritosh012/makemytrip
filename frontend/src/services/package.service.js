@@ -1,20 +1,21 @@
-import api from '../app/api'
+import api from "../app/api";
 
+// HOST (private)
 export const createPackage = (data) =>
-  api.post('/packages', data).then((r) => r.data)
+  api.post("/packages", data).then((res) => res.data);
 
 export const getPackages = (params) =>
-  api.get('/packages', { params }).then((r) => r.data)
+  api.get("/packages", { params }).then((res) => res.data);
 
 export const getPackage = (id) =>
-  api.get(`/packages/${id}`).then((r) => r.data)
+  api.get(`/packages/${id}`).then((res) => res.data);
 
 export const updatePackage = (id, data) =>
-  api.patch(`/packages/${id}`, data).then((r) => r.data)
+  api.patch(`/packages/${id}`, data).then((res) => res.data);
 
 export const deletePackage = (id) =>
-  api.delete(`/packages/${id}`).then((r) => r.data)
+  api.delete(`/packages/${id}`).then((res) => res.data);
 
-// Public: for end users browsing
-export const getPublicPackages = (params) =>
-  api.get('/packages/public', { params }).then((r) => r.data)
+// USER (public)
+export const getPublicPackages = () =>
+  api.get("/packages/public").then((res) => res.data);

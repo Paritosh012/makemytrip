@@ -1,4 +1,7 @@
-import api from '../app/api'
+import api from "../app/api";
 
-export const purchaseSubscription = (plan) =>
-  api.post('/subscriptions/purchase', { plan }).then((r) => r.data)
+export const purchaseSubscription = (planId) =>
+  api.post("/subscriptions/purchase", { plan: planId }).then((res) => res.data);
+
+export const getMySubscription = () =>
+  api.get("/subscriptions/me").then((res) => res.data);

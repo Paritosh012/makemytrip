@@ -1,10 +1,9 @@
-import api from '../app/api'
+import api from "../app/api";
 
 export const createBooking = (data) =>
-  api.post('/bookings', data).then((r) => r.data)
+  api.post("/bookings", data).then((res) => res.data);
+
+export const getBookings = () => api.get("/bookings").then((res) => res.data);
 
 export const cancelBooking = (bookingId) =>
-  api.patch(`/bookings/${bookingId}/cancel`).then((r) => r.data)
-
-export const getBookings = () =>
-  api.get('/bookings').then((r) => r.data)
+  api.patch(`/bookings/${bookingId}/cancel`).then((res) => res.data);
