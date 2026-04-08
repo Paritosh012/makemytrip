@@ -20,9 +20,20 @@ const errorMiddleware = require("./middlewares/error.middleware");
 
 const app = express();
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://makemytrip-frontend-kvdy.onrender.com",
+];
+
 app.use(
   cors({
-    origin: "https://makemytrip-1-x58v.onrender.com",
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   }),
 );
