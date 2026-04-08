@@ -29,7 +29,11 @@ const Home = () => {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState("");
 
-  // ✅ Fetch public packages
+  const [seats, setSeats] = useState(1);
+
+  // ======================
+  // FETCH PACKAGES
+  // ======================
   useEffect(() => {
     setLoading(true);
     setError("");
@@ -45,13 +49,18 @@ const Home = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  // ✅ Open booking modal
+  // ======================
+  // OPEN BOOKING MODAL
+  // ======================
   const handleBook = (pkg) => {
     setBookingPkg(pkg);
+    setSeats(1); // reset
     setBookingError("");
   };
 
-  // ✅ Confirm booking
+  // ======================
+  // CONFIRM BOOKING
+  // ======================
   const confirmBook = async () => {
     if (!bookingPkg) return;
 
@@ -61,6 +70,7 @@ const Home = () => {
     try {
       const res = await bookingService.createBooking({
         packageId: bookingPkg._id,
+        seats,
       });
 
       dispatch(
@@ -72,7 +82,9 @@ const Home = () => {
 
       setBookingPkg(null);
 
-      // 👉 Move to booking page (payment next)
+      // 🔥 Better UX feedback
+      alert("Booking created. Complete payment to confirm.");
+
       navigate("/bookings");
     } catch (err) {
       console.log("BOOKING ERROR:", err.response?.data);
@@ -132,8 +144,10 @@ const Home = () => {
                 </p>
 
                 <div className="pkg-meta">
-                  Starting Date : <span> {formatDate(pkg.startDate)}</span>
-                  <span>💺 {pkg.seatsAvailable} seats</span>
+                  <div>
+                    Start: <span>{formatDate(pkg.startDate)}</span>
+                  </div>
+                  <div>💺 {pkg.seatsAvailable} seats</div>
                 </div>
 
                 <div className="flex-between" style={{ marginTop: 12 }}>
@@ -156,7 +170,9 @@ const Home = () => {
         </div>
       )}
 
-      {/* ✅ Booking Modal */}
+      {/* ======================
+          BOOKING MODAL
+      ====================== */}
       {bookingPkg && (
         <div className="modal-overlay" onClick={() => setBookingPkg(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -166,11 +182,68 @@ const Home = () => {
               <h3>{bookingPkg.title}</h3>
               <p>📍 {bookingPkg.destination}</p>
               <p>₹{bookingPkg.price?.toLocaleString("en-IN")}</p>
+
+              {/* SEAT CONTROL */}
+              <div style={{ marginTop: 16 }}>
+                <label style={{ fontWeight: 500 }}>Select Seats</label>
+
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    marginTop: 8,
+                  }}
+                >
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setSeats((prev) => Math.max(1, prev - 1))}
+                    disabled={seats <= 1}
+                  >
+                    −
+                  </button>
+
+                  <div
+                    style={{
+                      minWidth: 60,
+                      textAlign: "center",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {seats} Seat{seats > 1 ? "s" : ""}
+                  </div>
+
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() =>
+                      setSeats((prev) =>
+                        Math.min(bookingPkg.seatsAvailable, prev + 1),
+                      )
+                    }
+                    disabled={seats >= bookingPkg.seatsAvailable}
+                  >
+                    +
+                  </button>
+                </div>
+
+                <div style={{ marginTop: 10, fontSize: 13 }}>
+                  Available: {bookingPkg.seatsAvailable}
+                </div>
+
+                <div style={{ marginTop: 8, fontWeight: 600 }}>
+                  Total: ₹{(bookingPkg.price * seats).toLocaleString("en-IN")}
+                </div>
+              </div>
             </div>
 
             {bookingError && (
               <div className="alert alert-error">{bookingError}</div>
             )}
+
+            {/* 🔥 UX IMPROVEMENT */}
+            <div className="alert alert-info">
+              Booking will be created first. Payment comes next.
+            </div>
 
             <div className="actions-row">
               <button
@@ -178,7 +251,7 @@ const Home = () => {
                 onClick={confirmBook}
                 disabled={bookingLoading}
               >
-                {bookingLoading ? "Processing..." : "Confirm & Continue"}
+                {bookingLoading ? "Processing..." : "Confirm Booking"}
               </button>
 
               <button

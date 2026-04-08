@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const subscriptionModel = require("../models/subscription.model");
 const packageModel = require("../models/package.model");
 const bookingModel = require("../models/booking.model");
+const razorpay = require("../config/razorpay");
 
 const createBooking = async (req, res) => {
   const session = await mongoose.startSession();
@@ -9,67 +10,32 @@ const createBooking = async (req, res) => {
   try {
     session.startTransaction();
 
-    const { packageId } = req.body;
+    const { packageId, seats } = req.body;
     const { userId } = req.user;
 
     if (!mongoose.Types.ObjectId.isValid(packageId)) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        success: false,
-        message: "Invalid packageId",
-      });
+      throw new Error("Invalid packageId");
     }
 
-    const pkg = await packageModel
-      .findOne({
-        _id: packageId,
-      })
-      .session(session);
-
-    if (!pkg) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(404).json({
-        success: false,
-        message: "Package not found",
-      });
+    if (!seats || seats < 1) {
+      throw new Error("Invalid seat count");
     }
 
-    if (pkg.status !== "ACTIVE") {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        success: false,
-        message: "Package is not available",
-      });
-    }
+    const pkg = await packageModel.findById(packageId).session(session);
 
-    if (pkg.seatsAvailable <= 0) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(400).json({
-        success: false,
-        message: "No seats available",
-      });
-    }
+    if (!pkg) throw new Error("Package not found");
+    if (pkg.status !== "ACTIVE") throw new Error("Package not available");
 
     const tenantId = pkg.tenantId;
 
     const subscription = await subscriptionModel.findOne({
-      tenantId: pkg.tenantId,
+      tenantId,
       status: "ACTIVE",
     });
 
-    if (!subscription) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(403).json({
-        success: false,
-        message: "No active subscription",
-      });
-    }
+    if (!subscription) throw new Error("No active subscription");
 
+    // monthly limit
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
@@ -83,14 +49,10 @@ const createBooking = async (req, res) => {
       .session(session);
 
     if (bookingCount >= subscription.maxBookingsPerMonth) {
-      await session.abortTransaction();
-      session.endSession();
-      return res.status(403).json({
-        success: false,
-        message: "Monthly booking limit reached",
-      });
+      throw new Error("Monthly booking limit reached");
     }
 
+    // ✅ CREATE ONLY (NO SEAT CHANGE)
     const booking = await bookingModel.create(
       [
         {
@@ -98,14 +60,12 @@ const createBooking = async (req, res) => {
           packageId,
           userId,
           status: "PENDING",
-          price: pkg.price,
+          price: pkg.price * seats,
+          seats,
         },
       ],
       { session },
     );
-
-    pkg.seatsAvailable -= 1;
-    await pkg.save({ session });
 
     await session.commitTransaction();
     session.endSession();
@@ -118,62 +78,38 @@ const createBooking = async (req, res) => {
     await session.abortTransaction();
     session.endSession();
 
-    console.error("Create Booking Error:", error);
-
-    return res.status(500).json({
+    return res.status(400).json({
       success: false,
-      message: "Booking failed",
+      message: error.message || "Booking failed",
     });
   }
 };
 
 const cancelBooking = async (req, res) => {
-  const session = await mongoose.startSession();
-
   try {
-    session.startTransaction();
-
     const { bookingId } = req.params;
-    const { userId, role } = req.user;
 
-    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-      await session.abortTransaction();
-      session.endSession();
+    console.log("=== CANCEL START ===", bookingId);
 
-      return res.status(400).json({
-        success: false,
-        message: "Invalid bookingId",
-      });
-    }
-
-    const booking = await bookingModel.findById(bookingId).session(session);
+    const booking = await bookingModel.findById(bookingId);
 
     if (!booking) {
-      await session.abortTransaction();
-      session.endSession();
-
       return res.status(404).json({
         success: false,
         message: "Booking not found",
       });
     }
 
-    // 🔒 Ownership check
-    if (role === "END_USER" && booking.userId.toString() !== userId) {
-      await session.abortTransaction();
-      session.endSession();
-
+    // ✅ Ownership check
+    if (booking.userId.toString() !== req.user.userId) {
       return res.status(403).json({
         success: false,
-        message: "Not allowed to cancel this booking",
+        message: "Unauthorized",
       });
     }
 
-    // ❌ Already cancelled
+    // ❌ Prevent double cancel
     if (booking.status === "CANCELLED") {
-      await session.abortTransaction();
-      session.endSession();
-
       return res.status(400).json({
         success: false,
         message: "Booking already cancelled",
@@ -182,53 +118,67 @@ const cancelBooking = async (req, res) => {
 
     // ❌ Invalid states
     if (!["PENDING", "CONFIRMED"].includes(booking.status)) {
-      await session.abortTransaction();
-      session.endSession();
-
       return res.status(400).json({
         success: false,
-        message: "Cannot cancel this booking",
+        message: "Invalid booking state",
       });
     }
 
-    // 🔥 Restore seats ONLY if confirmed
-    if (booking.status === "CONFIRMED") {
-      const pkg = await packageModel.findByIdAndUpdate(
-        booking.packageId,
-        {
-          $inc: { seatsAvailable: booking.seats || 1 },
-        },
-        { session },
-      );
+    // ✅ Get package
+    const pkg = await packageModel.findById(booking.packageId);
 
-      if (!pkg) {
-        throw new Error("Package not found while restoring seats");
-      }
+    if (!pkg) {
+      return res.status(404).json({
+        success: false,
+        message: "Package not found",
+      });
     }
 
-    // ✅ Update booking
+    // ❌ Cannot cancel after trip starts
+    if (pkg.startDate && new Date() > pkg.startDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Cannot cancel after trip starts",
+      });
+    }
+
+    // =========================
+    // 🔥 MOCK REFUND LOGIC
+    // =========================
+    if (booking.paymentStatus === "SUCCESS") {
+      booking.paymentStatus = "REFUNDED";
+    } else if (booking.paymentStatus === "PENDING") {
+      booking.paymentStatus = "FAILED";
+    }
+
+    // =========================
+    // 🔥 RESTORE SEATS
+    // =========================
+    if (booking.paymentStatus === "REFUNDED") {
+      pkg.seatsAvailable += booking.seats;
+      await pkg.save();
+    }
+
+    // =========================
+    // 🔥 FINAL STATE
+    // =========================
     booking.status = "CANCELLED";
     booking.cancelledAt = new Date();
 
-    await booking.save({ session });
+    await booking.save();
 
-    await session.commitTransaction();
-    session.endSession();
+    console.log("=== CANCEL SUCCESS ===");
 
-    return res.status(200).json({
+    return res.json({
       success: true,
-      message: "Booking cancelled successfully",
-      data: booking,
+      message: "Booking cancelled (mock refund applied)",
     });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-
-    console.error("Cancel Booking Error:", error);
+    console.error("CANCEL ERROR:", error);
 
     return res.status(500).json({
       success: false,
-      message: error.message || "Cancel booking failed",
+      message: "Cancel booking failed",
     });
   }
 };
@@ -236,8 +186,9 @@ const cancelBooking = async (req, res) => {
 const getBookings = async (req, res) => {
   try {
     const bookings = await bookingModel
-      .find({ userId: req.user._id })
-      .populate("packageId"); // 🔥 IMPORTANT
+      .find({ userId: req.user.userId })
+      .populate("packageId")
+      .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,

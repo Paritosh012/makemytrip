@@ -24,11 +24,14 @@ const createOrder = async (req, res) => {
       });
     }
 
-    // prevent multiple orders
     if (booking.razorpayOrderId) {
-      return res.status(400).json({
-        success: false,
-        message: "Order already created",
+      return res.json({
+        success: true,
+        order: {
+          id: booking.razorpayOrderId,
+          amount: booking.price * 100,
+          currency: "INR",
+        },
       });
     }
 
@@ -69,7 +72,7 @@ const verifyPayment = async (req, res) => {
       });
     }
 
-    // ownership check
+    // ownership
     if (booking.userId.toString() !== req.user.userId) {
       return res.status(403).json({
         success: false,
@@ -77,15 +80,15 @@ const verifyPayment = async (req, res) => {
       });
     }
 
-    // already confirmed (idempotency - simple version)
+    // 🔥 idempotency
     if (booking.status === "CONFIRMED") {
-      return res.status(400).json({
-        success: false,
-        message: "Booking already confirmed",
+      return res.json({
+        success: true,
+        message: "Already confirmed",
       });
     }
 
-    // verify signature
+    // 🔐 signature verify
     const expected = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(razorpay_order_id + "|" + razorpay_payment_id)
@@ -98,14 +101,40 @@ const verifyPayment = async (req, res) => {
       });
     }
 
-    // confirm booking
-    await confirmBookingInternal(booking._id);
+    // =========================
+    // 🔥 SEAT DEDUCTION (CORRECT PLACE)
+    // =========================
+    const pkg = await require("../models/package.model").findById(
+      booking.packageId,
+    );
 
-    // store payment
-    booking.razorpayPaymentId = razorpay_payment_id;
+    if (!pkg) {
+      return res.status(404).json({
+        success: false,
+        message: "Package not found",
+      });
+    }
+
+    if (pkg.seatsAvailable < booking.seats) {
+      return res.status(400).json({
+        success: false,
+        message: "Seats no longer available",
+      });
+    }
+
+    // deduct seats
+    pkg.seatsAvailable -= booking.seats;
+    await pkg.save();
+
+    // =========================
+    // 🔥 CONFIRM BOOKING
+    // =========================
+    booking.status = "CONFIRMED";
     booking.paymentStatus = "SUCCESS";
+    booking.razorpayPaymentId = razorpay_payment_id;
     booking.isPaymentVerified = true;
     booking.paymentVerifiedAt = new Date();
+    booking.confirmedAt = new Date();
 
     await booking.save();
 

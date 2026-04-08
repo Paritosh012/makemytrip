@@ -2,67 +2,96 @@ import { useEffect, useState } from "react";
 import * as subscriptionService from "../../services/subscription.service";
 
 const PLANS = [
-  { id: "BASIC", label: "Basic", price: "₹999", agents: 5, bookings: 50 },
-  {
-    id: "PRO",
-    label: "Pro",
-    price: "₹2,499",
-    agents: 20,
-    bookings: 200,
-    featured: true,
-  },
-  {
-    id: "PREMIUM",
-    label: "Premium",
-    price: "₹5,999",
-    agents: 100,
-    bookings: 1000,
-  },
+  { id: "BASIC", label: "Basic", price: 999, agents: 5, bookings: 50 },
+  { id: "PRO", label: "Pro", price: 2499, agents: 20, bookings: 200, featured: true },
+  { id: "PREMIUM", label: "Premium", price: 5999, agents: 100, bookings: 1000 },
 ];
 
 const Subscription = () => {
-  const [loading, setLoading] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [currentPlan, setCurrentPlan] = useState(null);
+  const [subscription, setSubscription] = useState(null);
 
-  // 🔥 fetch current subscription
+  // 🔥 Fetch subscription properly
   useEffect(() => {
-    subscriptionService
-      .getMySubscription()
-      .then((res) => {
-        setCurrentPlan(res.data?.plan || null);
-      })
-      .catch(() => {
-        setCurrentPlan(null);
-      });
+    const fetchSubscription = async () => {
+      try {
+        const res = await subscriptionService.getMySubscription();
+        setSubscription(res.data || null);
+      } catch {
+        setSubscription(null);
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+
+    fetchSubscription();
   }, []);
 
   const handlePurchase = async (plan) => {
-    if (currentPlan) {
+    if (subscription?.status === "ACTIVE") {
       setMessage("You already have an active subscription");
       return;
     }
 
     setLoading(plan);
     setMessage("");
+    setError("");
 
     try {
-      await subscriptionService.purchaseSubscription(plan);
-      setMessage("Subscription activated");
+      // 🔥 Create order
+      const { order } = await subscriptionService.createSubscriptionOrder(plan);
 
-      setTimeout(() => window.location.reload(), 1200);
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: order.currency,
+        name: "Travel SaaS",
+        description: `${plan} Subscription`,
+        order_id: order.id,
+
+        handler: async function (response) {
+          try {
+            await subscriptionService.verifySubscriptionPayment({
+              ...response,
+              plan,
+            });
+
+            setMessage("Subscription activated successfully");
+
+            // 🔥 refresh state instead of reload
+            const res = await subscriptionService.getMySubscription();
+            setSubscription(res.data || null);
+
+          } catch {
+            setError("Payment verification failed");
+          }
+        },
+
+        modal: {
+          ondismiss: () => {
+            setMessage("Payment cancelled");
+          },
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
     } catch (err) {
-      console.log("FULL ERROR:", err);
-
-      const msg =
-        err.response?.data?.message || err.message || "Subscription failed";
-
-      setMessage(msg);
+      setError(err.message || "Subscription failed");
     } finally {
-      setLoading(null);
+      setLoading(false);
     }
   };
+
+  if (initialLoading) {
+    return <div>Loading subscription...</div>;
+  }
+
+  const currentPlan = subscription?.plan;
+  const isActive = subscription?.status === "ACTIVE";
 
   return (
     <div>
@@ -72,28 +101,19 @@ const Subscription = () => {
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
-      {message && (
-        <div
-          className={
-            message.toLowerCase().includes("fail") ||
-            message.toLowerCase().includes("exists")
-              ? "alert alert-error"
-              : "alert alert-success"
-          }
-        >
-          {message}
-        </div>
-      )}
+      {message && <div className="alert alert-success">{message}</div>}
 
-      {currentPlan && (
+      {/* 🔥 Current plan info */}
+      {subscription && (
         <div className="alert alert-info" style={{ marginBottom: 20 }}>
-          Current Plan: <strong>{currentPlan}</strong>
+          Plan: <strong>{currentPlan}</strong> | Status:{" "}
+          <strong>{subscription.status}</strong>
         </div>
       )}
 
       <div className="grid-3" style={{ maxWidth: 1000 }}>
         {PLANS.map((plan) => {
-          const isActive = currentPlan === plan.id;
+          const isCurrent = currentPlan === plan.id;
 
           return (
             <div
@@ -101,38 +121,25 @@ const Subscription = () => {
               className="card"
               style={{
                 padding: 20,
-                border: isActive
+                border: isCurrent
                   ? "2px solid var(--accent2)"
                   : "1px solid var(--border)",
                 position: "relative",
               }}
             >
-              {plan.featured && !isActive && (
-                <span
-                  className="badge badge-green"
-                  style={{ position: "absolute", top: 10, right: 10 }}
-                >
-                  Popular
-                </span>
+              {plan.featured && !isCurrent && (
+                <span className="badge badge-green">Popular</span>
               )}
 
-              {isActive && (
-                <span
-                  className="badge badge-blue"
-                  style={{ position: "absolute", top: 10, right: 10 }}
-                >
-                  Active
-                </span>
+              {isCurrent && (
+                <span className="badge badge-blue">Active</span>
               )}
 
               <h2>{plan.label}</h2>
 
               <div style={{ fontSize: 28, fontWeight: 600 }}>
-                {plan.price}
-                <span style={{ fontSize: 14, color: "var(--muted)" }}>
-                  {" "}
-                  /month
-                </span>
+                ₹{plan.price.toLocaleString("en-IN")}
+                <span style={{ fontSize: 14 }}> /month</span>
               </div>
 
               <ul style={{ marginTop: 15, marginBottom: 20 }}>
@@ -143,16 +150,16 @@ const Subscription = () => {
               </ul>
 
               <button
-                className={`btn ${isActive ? "btn-secondary" : "btn-primary"}`}
-                disabled={isActive || loading !== null}
+                className={`btn ${isCurrent ? "btn-secondary" : "btn-primary"}`}
+                disabled={isCurrent || loading !== false || isActive}
                 onClick={() => handlePurchase(plan.id)}
                 style={{ width: "100%" }}
               >
-                {isActive
+                {isCurrent
                   ? "Active Plan"
                   : loading === plan.id
-                    ? "Processing..."
-                    : `Get ${plan.label}`}
+                  ? "Processing..."
+                  : `Get ${plan.label}`}
               </button>
             </div>
           );
@@ -162,4 +169,4 @@ const Subscription = () => {
   );
 };
 
-export default Subscription;
+export default Subscription;  

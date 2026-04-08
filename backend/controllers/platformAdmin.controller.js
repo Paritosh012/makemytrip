@@ -224,6 +224,10 @@ const updateTenantPlan = async (req, res) => {
       });
     }
 
+    await Tenant.findByIdAndUpdate(tenantId, {
+      subscriptionId: subscription._id,
+    });
+
     return res.status(200).json({
       success: true,
       data: subscription,

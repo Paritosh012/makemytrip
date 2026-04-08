@@ -23,6 +23,18 @@ const createPackage = async (req, res) => {
       endDate,
     } = req.body;
 
+    if (req.tenant.status !== "ACTIVE") {
+      return res.status(403).json({
+        message: "Tenant is not active",
+      });
+    }
+
+    if (!req.subscription || req.subscription.status !== "ACTIVE") {
+      return res.status(403).json({
+        message: "Active subscription required",
+      });
+    }
+
     // 🔧 sanitize
     title = title?.trim();
     destination = destination?.trim();
@@ -218,25 +230,56 @@ const updatePackage = async (req, res) => {
       });
     }
 
-    const allowedUpdates = [
-      "title",
-      "destination",
-      "description",
-      "price",
-      "startDate",
-      "endDate",
-      "status",
-    ];
+    const {
+      title,
+      destination,
+      description,
+      price,
+      startDate,
+      endDate,
+      status,
+      seatsTotal,
+    } = req.body;
 
-    const updates = {};
+    // =========================
+    // 🔥 BASIC FIELD UPDATES
+    // =========================
+    if (title !== undefined) pkg.title = title.trim();
+    if (destination !== undefined) pkg.destination = destination.trim();
+    if (description !== undefined) pkg.description = description.trim();
+    if (price !== undefined) pkg.price = price;
+    if (startDate !== undefined) pkg.startDate = new Date(startDate);
+    if (endDate !== undefined) pkg.endDate = new Date(endDate);
+    if (status !== undefined) pkg.status = status;
 
-    allowedUpdates.forEach((field) => {
-      if (req.body[field] !== undefined) {
-        updates[field] = req.body[field];
+    // =========================
+    // 🔥 SEATS LOGIC (CRITICAL)
+    // =========================
+    if (seatsTotal !== undefined) {
+      if (seatsTotal <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Seats must be greater than 0",
+        });
       }
-    });
 
-    Object.assign(pkg, updates);
+      // seats already booked
+      const bookedSeats = pkg.seatsTotal - pkg.seatsAvailable;
+
+      // ❌ cannot reduce below booked seats
+      if (seatsTotal < bookedSeats) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot reduce seats below already booked (${bookedSeats})`,
+        });
+      }
+
+      // ✅ recalculate available
+      const newAvailable = seatsTotal - bookedSeats;
+
+      pkg.seatsTotal = seatsTotal;
+      pkg.seatsAvailable = newAvailable;
+    }
 
     await pkg.save();
 
@@ -246,7 +289,7 @@ const updatePackage = async (req, res) => {
       data: pkg,
     });
   } catch (error) {
-    console.error(error);
+    console.error("UPDATE PACKAGE ERROR:", error);
 
     return res.status(500).json({
       success: false,

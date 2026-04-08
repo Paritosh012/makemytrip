@@ -40,7 +40,6 @@ const bookingSchema = new mongoose.Schema(
     seats: {
       type: Number,
       default: 1,
-      min: 1,
     },
 
     // 💳 Payment fields (MANDATORY)
@@ -55,12 +54,11 @@ const bookingSchema = new mongoose.Schema(
 
     paymentStatus: {
       type: String,
-      enum: ["PENDING", "SUCCESS", "FAILED"],
+      enum: ["PENDING", "SUCCESS", "FAILED", "REFUNDED"],
       default: "PENDING",
       index: true,
     },
 
-    // 🧠 Idempotency / control
     isPaymentVerified: {
       type: Boolean,
       default: false,

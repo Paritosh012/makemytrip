@@ -1,26 +1,20 @@
-import { Navigate } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
+import { Navigate } from "react-router-dom";
+import { useSelector } from "react-redux";
 
-const ProtectedRoute = ({ children, roles }) => {
-  const { user, isAuthenticated, loading } = useAuth()
+const ProtectedRoute = ({ children }) => {
+  const { user, loading } = useSelector((state) => state.auth);
 
+  // ✅ Wait until auth is resolved
   if (loading) {
-    return (
-      <div className="loader-wrap">
-        <div className="spinner" />
-      </div>
-    )
+    return <div>Loading...</div>; // or spinner
   }
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
+  // ❌ Only redirect AFTER loading is done
+  if (!user) {
+    return <Navigate to="/login" replace />;
   }
 
-  if (roles && !roles.includes(user?.role)) {
-    return <Navigate to="/unauthorized" replace />
-  }
+  return children;
+};
 
-  return children
-}
-
-export default ProtectedRoute
+export default ProtectedRoute;
