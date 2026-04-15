@@ -25,9 +25,23 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["SUPER_ADMIN", "HOST", "END_USER"],
+      enum: ["SUPER_ADMIN", "HOST", "END_USER", "ADMIN"],
       default: "END_USER",
     },
+    permissions: [
+      {
+        type: String,
+        enum: [
+          "VIEW_USERS",
+          "EDIT_USERS",
+          "DELETE_USERS",
+          "VIEW_TENANTS",
+          "MANAGE_TENANTS",
+          "APPROVE_HOSTS",
+        ],
+      },
+    ],
+
     tenantId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Tenant",

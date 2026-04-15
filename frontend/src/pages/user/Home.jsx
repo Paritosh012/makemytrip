@@ -41,7 +41,7 @@ const Home = () => {
     packageService
       .getPublicPackages()
       .then((res) => {
-        setPackages(res.data || []);
+        setPackages(res || []);
       })
       .catch((err) => {
         setError(err.response?.data?.message || "Failed to load packages");

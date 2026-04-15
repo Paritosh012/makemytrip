@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import * as hostService from "../../services/host.service";
+import { useAuth } from "../../hooks/useAuth";
 
 const statusBadge = (status) => {
   const map = {
@@ -14,24 +15,40 @@ const statusBadge = (status) => {
 };
 
 const Applications = () => {
+  const { user } = useAuth();
+
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionId, setActionId] = useState(null);
   const [filter, setFilter] = useState("");
 
-  const fetchApplications = () => {
+  // 🔥 PERMISSION CHECK (FIXED)
+  if (
+    user?.role !== "SUPER_ADMIN" &&
+    !user.permissions?.includes("APPROVE_HOSTS")
+  ) {
+    return <h2>Access Denied</h2>;
+  }
+
+  const fetchApplications = async () => {
     setLoading(true);
-    hostService
-      .getApplications(filter || undefined)
-      .then((data) => setApplications(data.data || []))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    setError("");
+
+    try {
+      const data = await hostService.getApplications(filter || undefined);
+
+      setApplications(data.data || []);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
-    fetchApplications();
-  }, [filter]);
+    if (user) fetchApplications();
+  }, [filter, user]);
 
   const handleApprove = async (id) => {
     setActionId(id);
@@ -39,7 +56,7 @@ const Applications = () => {
       await hostService.approveApplication(id);
       fetchApplications();
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || err.message);
     } finally {
       setActionId(null);
     }
@@ -47,12 +64,13 @@ const Applications = () => {
 
   const handleReject = async (id) => {
     if (!window.confirm("Reject this application?")) return;
+
     setActionId(id);
     try {
       await hostService.rejectApplication(id);
       fetchApplications();
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || err.message);
     } finally {
       setActionId(null);
     }
@@ -67,20 +85,9 @@ const Applications = () => {
 
       {error && <div className="alert alert-error">{error}</div>}
 
+      {/* FILTER */}
       <div style={{ marginBottom: 16 }}>
-        <select
-          className="form-group"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          style={{
-            padding: "9px 14px",
-            background: "var(--surface2)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius)",
-            color: "var(--text)",
-            fontSize: 14,
-          }}
-        >
+        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
           <option value="">All Applications</option>
           <option value="PENDING">Pending</option>
           <option value="APPROVED">Approved</option>
@@ -89,70 +96,59 @@ const Applications = () => {
       </div>
 
       {loading ? (
-        <div className="loader-wrap">
-          <div className="spinner" />
-        </div>
+        <div>Loading...</div>
       ) : applications.length === 0 ? (
-        <div className="empty-state">
-          <div className="icon">📋</div>
-          <p>No applications found</p>
-        </div>
+        <p>No applications found</p>
       ) : (
-        <div className="card">
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Agency</th>
-                  <th>Applicant</th>
-                  <th>Business Email</th>
-                  <th>Phone</th>
-                  <th>Status</th>
-                  <th>Date</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {applications.map((app) => (
-                  <tr key={app._id}>
-                    <td style={{ fontWeight: 500 }}>{app.agencyName}</td>
-                    <td>
-                      <div>{app.userId?.name}</div>
-                      <div className="text-muted">{app.userId?.email}</div>
-                    </td>
-                    <td className="text-muted">{app.businessEmail}</td>
-                    <td className="text-muted">{app.phone}</td>
-                    <td>{statusBadge(app.status)}</td>
-                    <td className="text-muted">
-                      {new Date(app.createdAt).toLocaleDateString("en-IN")}
-                    </td>
-                    <td>
-                      {app.status === "PENDING" && (
-                        <div className="actions-row">
-                          <button
-                            className="btn btn-primary btn-sm"
-                            style={{ width: "auto" }}
-                            onClick={() => handleApprove(app._id)}
-                            disabled={actionId === app._id}
-                          >
-                            Approve
-                          </button>
-                          <button
-                            className="btn btn-danger btn-sm"
-                            onClick={() => handleReject(app._id)}
-                            disabled={actionId === app._id}
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Agency</th>
+              <th>Applicant</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {applications.map((app) => (
+              <tr key={app._id}>
+                <td>{app.agencyName}</td>
+
+                <td>
+                  {app.userId?.name}
+                  <br />
+                  {app.userId?.email}
+                </td>
+
+                <td>{statusBadge(app.status)}</td>
+
+                <td>{new Date(app.createdAt).toLocaleDateString("en-IN")}</td>
+
+                <td>
+                  {app.status === "PENDING" && (
+                    <>
+                      <button
+                        onClick={() => handleApprove(app._id)}
+                        disabled={actionId === app._id}
+                      >
+                        Approve
+                      </button>
+
+                      <button
+                        onClick={() => handleReject(app._id)}
+                        disabled={actionId === app._id}
+                      >
+                        Reject
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   );

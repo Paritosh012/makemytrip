@@ -1,17 +1,16 @@
 import { Navigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const { user, loading } = useSelector((state) => state.auth);
 
-  // ✅ Wait until auth is resolved
-  if (loading) {
-    return <div>Loading...</div>; // or spinner
-  }
+  if (loading) return <div>Loading...</div>;
 
-  // ❌ Only redirect AFTER loading is done
-  if (!user) {
-    return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
+
+  // 🔥 Role-based protection
+  if (allowedRoles.length && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/unauthorized" replace />;
   }
 
   return children;

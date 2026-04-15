@@ -1,5 +1,5 @@
-import { Outlet } from 'react-router-dom'
-import Sidebar from './Sidebar'
+import { Outlet } from "react-router-dom";
+import Sidebar from "./Sidebar";
 
 const AppLayout = () => {
   return (
@@ -9,7 +9,7 @@ const AppLayout = () => {
         <Outlet />
       </main>
     </div>
-  )
-}
+  );
+};
 
-export default AppLayout
+export default AppLayout;

@@ -8,17 +8,24 @@ const rateLimit = require("express-rate-limit");
 
 const connectDB = require("./config/db");
 
+// ROUTES
 const authRoutes = require("./routes/auth.routes");
-const platformAdminRoutes = require("./routes/platformAdmin.routes");
+const adminRoutes = require("./routes/admin.routes"); // ✅ renamed
 const hostApplicationRoutes = require("./routes/host.application.routes");
 const packageRoutes = require("./routes/package.routes");
-const subscriptionRoutes = require("./routes/subscription.routes.js");
-const bookingRoutes = require("./routes/booking.routes.js");
+const subscriptionRoutes = require("./routes/subscription.routes");
+const bookingRoutes = require("./routes/booking.routes");
 const paymentRoutes = require("./routes/payment.routes");
 
 const errorMiddleware = require("./middlewares/error.middleware");
 
 const app = express();
+
+/*
+-------------------------------------------------------
+SECURITY + MIDDLEWARE
+-------------------------------------------------------
+*/
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -38,16 +45,27 @@ app.use(
   }),
 );
 
-const limiter = rateLimit({
+// 🔥 Rate limit (general)
+const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
 });
 
-app.use(limiter);
+// 🔥 Stricter limiter for auth
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+});
+
 app.use(helmet());
 app.use(cookieParser());
 app.use(express.json({ limit: "10kb" }));
 
+/*
+-------------------------------------------------------
+HEALTH CHECK
+-------------------------------------------------------
+*/
 app.get("/health", (req, res) => {
   res.status(200).json({
     status: "OK",
@@ -55,20 +73,46 @@ app.get("/health", (req, res) => {
   });
 });
 
-app.use("/api/auth", authRoutes);
-app.use("/api/tenants", platformAdminRoutes);
-app.use("/api/host-applications", hostApplicationRoutes);
-app.use("/api/packages", packageRoutes);
-app.use("/api/subscriptions", subscriptionRoutes);
-app.use("/api/bookings", bookingRoutes);
-app.use("/api/payments", paymentRoutes);
+/*
+-------------------------------------------------------
+ROUTES
+-------------------------------------------------------
+*/
 
+// Public/Auth
+app.use("/api/auth", authLimiter, authRoutes);
+
+// Admin (🔥 FIXED)
+app.use("/api/admin", globalLimiter, adminRoutes);
+
+// Domain routes
+app.use("/api/host-applications", globalLimiter, hostApplicationRoutes);
+app.use("/api/packages", globalLimiter, packageRoutes);
+app.use("/api/subscriptions", globalLimiter, subscriptionRoutes);
+app.use("/api/bookings", globalLimiter, bookingRoutes);
+app.use("/api/payments", globalLimiter, paymentRoutes);
+
+/*
+-------------------------------------------------------
+ERROR HANDLER
+-------------------------------------------------------
+*/
 app.use(errorMiddleware);
 
-const PORT = process.env.PORT;
+/*
+-------------------------------------------------------
+SERVER START
+-------------------------------------------------------
+*/
+const PORT = process.env.PORT || 5000;
 
-connectDB().then(() => {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+connectDB()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("DB connection failed:", err);
+    process.exit(1);
   });
-});
