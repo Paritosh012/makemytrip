@@ -1,21 +1,36 @@
-const checkPermission = (permissions = []) => {
+const permissionMiddleware = (...requiredPermissions) => {
   return (req, res, next) => {
-    const user = req.user;
+    try {
+      // SUPER_ADMIN bypass
+      if (req.user.role === "SUPER_ADMIN") {
+        return next();
+      }
 
-    if (user.role === "SUPER_ADMIN") return next();
+      // 🚨 SAFE GUARD
+      const userPermissions = Array.isArray(req.user.permissions)
+        ? req.user.permissions
+        : [];
 
-    if (user.role !== "ADMIN") {
-      return res.status(403).json({ message: "Access denied" });
+      const hasPermission = requiredPermissions.some((perm) =>
+        userPermissions.includes(perm)
+      );
+
+      if (!hasPermission) {
+        return res.status(403).json({
+          success: false,
+          message: "Permission denied",
+        });
+      }
+
+      next();
+    } catch (err) {
+      console.error("Permission middleware error:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Permission check failed",
+      });
     }
-
-    const hasPermission = permissions.some((p) => user.permissions.includes(p));
-
-    if (!hasPermission) {
-      return res.status(403).json({ message: "Permission denied" });
-    }
-
-    next();
   };
 };
 
-module.exports = checkPermission;
+module.exports = permissionMiddleware;

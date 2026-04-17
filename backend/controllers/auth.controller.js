@@ -310,6 +310,7 @@ const login = async (req, res) => {
         userId: user._id,
         role: user.role,
         tenantId: user.tenantId,
+        permissions: user.permissions,
       },
       process.env.JWT_SECRET,
       { expiresIn: "1d" },

@@ -1,32 +1,42 @@
-import api from "../../app/api";
+  import api from "../../app/api";
 
-// TENANT APIS
+  // ================= USERS =================
 
-export const getTenants = () => api.get("/admin/tenants").then((r) => r.data);
+  export const getUsers = (params = {}) =>
+    api.get("/admin/users", { params }).then((r) => r.data);
 
-export const getOneTenant = (id) =>
-  api.get(`/admin/tenants/${id}`).then((r) => r.data);
+  export const promoteToAdmin = (userId) =>
+    api.patch(`/admin/users/${userId}/promote`).then((r) => r.data);
 
-export const suspendTenant = (id) =>
-  api.patch(`/admin/tenants/${id}/suspend`).then((r) => r.data);
+  export const updatePermissions = (userId, permissions) =>
+    api
+      .patch(`/admin/users/${userId}/permissions`, { permissions })
+      .then((r) => r.data);
 
-export const activateTenant = (id) =>
-  api.patch(`/admin/tenants/${id}/activate`).then((r) => r.data);
+  export const toggleSuspend = (userId) =>
+    api.patch(`/admin/users/${userId}/suspend`).then((r) => r.data);
 
-export const updateTenantPlan = (id, plan) =>
-  api.patch(`/admin/tenants/${id}/plan`, { plan }).then((r) => r.data);
+  // ================= TENANTS =================
 
-// USER APIS
+  // 🔥 THIS IS WHAT YOU ARE MISSING
 
-export const getUsers = () => api.get("/admin/users").then((r) => r.data);
+  export const getTenants = (params = {}) =>
+    api.get("/admin/tenants", { params }).then((r) => r.data);
 
-export const promoteToAdmin = (id) =>
-  api.patch(`/admin/users/${id}/promote`).then((r) => r.data);
+  export const getTenant = (tenantId) =>
+    api.get(`/admin/tenants/${tenantId}`).then((r) => r.data);
 
-export const updateUserPermissions = (id, permissions) =>
-  api
-    .patch(`/admin/users/${id}/permissions`, { permissions })
-    .then((r) => r.data);
+  export const suspendTenant = (tenantId) =>
+    api
+      .patch(`/admin/tenants/${tenantId}/suspend`)
+      .then((r) => r.data);
 
-export const toggleSuspend = (id) =>
-  api.patch(`/admin/users/${id}/suspend`).then((r) => r.data);
+  export const activateTenant = (tenantId) =>
+    api
+      .patch(`/admin/tenants/${tenantId}/activate`)
+      .then((r) => r.data);
+
+  export const updateTenantPlan = (tenantId, plan) =>
+    api
+      .patch(`/admin/tenants/${tenantId}/plan`, { plan })
+      .then((r) => r.data);

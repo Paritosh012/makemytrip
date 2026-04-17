@@ -31,8 +31,7 @@ export default function Users() {
     .filter((u) => {
       const q = search.toLowerCase();
       return (
-        u.name?.toLowerCase().includes(q) ||
-        u.email?.toLowerCase().includes(q)
+        u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q)
       );
     })
     .filter((u) => (roleFilter ? u.role === roleFilter : true));
@@ -64,9 +63,7 @@ export default function Users() {
   const handleToggleSuspend = async (user) => {
     if (actionLoading === user._id) return;
 
-    const msg = user.isSuspended
-      ? "Activate this user?"
-      : "Suspend this user?";
+    const msg = user.isSuspended ? "Activate this user?" : "Suspend this user?";
 
     if (!window.confirm(msg)) return;
 
@@ -75,9 +72,7 @@ export default function Users() {
     try {
       await adminService.toggleSuspend(user._id);
 
-      showToast(
-        user.isSuspended ? "User activated" : "User suspended"
-      );
+      showToast(user.isSuspended ? "User activated" : "User suspended");
 
       dispatch(fetchUsers());
     } catch (err) {
@@ -92,14 +87,17 @@ export default function Users() {
     try {
       await adminService.updatePermissions(
         selectedUser._id,
-        selectedPermissions
+        selectedPermissions,
       );
 
       showToast("Permissions updated");
       setSelectedUser(null);
       dispatch(fetchUsers());
     } catch (err) {
-      showToast("Failed to update permissions", "error");
+      showToast(
+        err.response?.data?.message || "Failed to update permissions",
+        "error",
+      );
     }
   };
 
@@ -154,9 +152,7 @@ export default function Users() {
                   {/* USER */}
                   <td>
                     <div className="user-cell">
-                      <div className="avatar">
-                        {u.name?.charAt(0)}
-                      </div>
+                      <div className="avatar">{u.name?.charAt(0)}</div>
                       <div>
                         <div className="name">{u.name}</div>
                         <div className="email">{u.email}</div>
@@ -166,9 +162,7 @@ export default function Users() {
 
                   {/* ROLE */}
                   <td>
-                    <span className={`badge role-${u.role}`}>
-                      {u.role}
-                    </span>
+                    <span className={`badge role-${u.role}`}>{u.role}</span>
                   </td>
 
                   {/* STATUS */}
@@ -176,9 +170,7 @@ export default function Users() {
                     <div className="status-stack">
                       <span
                         className={`badge ${
-                          u.isSuspended
-                            ? "badge-red"
-                            : "badge-green"
+                          u.isSuspended ? "badge-red" : "badge-green"
                         }`}
                       >
                         {u.isSuspended ? "Suspended" : "Active"}
@@ -186,14 +178,10 @@ export default function Users() {
 
                       <span
                         className={`badge ${
-                          u.isVerified
-                            ? "badge-blue"
-                            : "badge-yellow"
+                          u.isVerified ? "badge-blue" : "badge-yellow"
                         }`}
                       >
-                        {u.isVerified
-                          ? "Verified"
-                          : "Unverified"}
+                        {u.isVerified ? "Verified" : "Unverified"}
                       </span>
                     </div>
                   </td>
@@ -204,15 +192,10 @@ export default function Users() {
                     {u.role === "END_USER" && (
                       <button
                         className="btn btn-primary"
-                        disabled={
-                          actionLoading === u._id ||
-                          !u.isVerified
-                        }
+                        disabled={actionLoading === u._id || !u.isVerified}
                         onClick={() => handlePromote(u)}
                       >
-                        {!u.isVerified
-                          ? "Verify Required"
-                          : "Promote"}
+                        {!u.isVerified ? "Verify Required" : "Promote"}
                       </button>
                     )}
 
@@ -222,9 +205,7 @@ export default function Users() {
                         className="btn btn-secondary"
                         onClick={() => {
                           setSelectedUser(u);
-                          setSelectedPermissions(
-                            u.permissions || []
-                          );
+                          setSelectedPermissions(u.permissions || []);
                         }}
                       >
                         Permissions
@@ -235,20 +216,16 @@ export default function Users() {
                     {u.role !== "SUPER_ADMIN" && (
                       <button
                         className={`btn ${
-                          u.isSuspended
-                            ? "btn-secondary"
-                            : "btn-danger"
+                          u.isSuspended ? "btn-secondary" : "btn-danger"
                         }`}
                         disabled={actionLoading === u._id}
-                        onClick={() =>
-                          handleToggleSuspend(u)
-                        }
+                        onClick={() => handleToggleSuspend(u)}
                       >
                         {actionLoading === u._id
                           ? "Processing..."
                           : u.isSuspended
-                          ? "Activate"
-                          : "Suspend"}
+                            ? "Activate"
+                            : "Suspend"}
                       </button>
                     )}
                   </td>
@@ -281,7 +258,7 @@ export default function Users() {
                       setSelectedPermissions((prev) =>
                         prev.includes(perm)
                           ? prev.filter((p) => p !== perm)
-                          : [...prev, perm]
+                          : [...prev, perm],
                       )
                     }
                   />
@@ -310,9 +287,7 @@ export default function Users() {
 
       {/* TOAST */}
       {toast && (
-        <div className={`toast toast-${toast.type}`}>
-          {toast.message}
-        </div>
+        <div className={`toast toast-${toast.type}`}>{toast.message}</div>
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import * as adminService from "../../features/admin/admin.service";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -7,6 +7,10 @@ const PLANS = ["BASIC", "PRO", "PREMIUM"];
 const Tenants = () => {
   const { user } = useAuth();
 
+  // FIX: all hooks are declared unconditionally at the top level.
+  // Previously, fetchTenants (used in useEffect) and the useEffect calls
+  // themselves appeared AFTER conditional early returns, which violates the
+  // Rules of Hooks and causes React to throw in strict mode.
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -17,40 +21,27 @@ const Tenants = () => {
 
   const [toast, setToast] = useState(null);
 
-  // 🔐 AUTH
-  if (!user) return <div>Loading...</div>;
-
-  const hasAccess =
-    user.role === "SUPER_ADMIN" ||
-    user.permissions?.includes("VIEW_TENANTS");
-
-  if (!hasAccess) return <h2>Access Denied</h2>;
-
-  // 📦 FETCH
-  const fetchTenants = async () => {
+  const fetchTenants = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
       const data = await adminService.getTenants();
-
       const tenantsArr = Array.isArray(data)
         ? data
         : data?.data?.tenants || data?.data || data?.tenants || [];
-
       setTenants(tenantsArr);
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchTenants();
   }, []);
 
-  // 🔔 TOAST AUTO HIDE
+  useEffect(() => {
+    if (user) fetchTenants();
+  }, [user, fetchTenants]);
+
   useEffect(() => {
     if (toast) {
       const t = setTimeout(() => setToast(null), 2500);
@@ -58,17 +49,26 @@ const Tenants = () => {
     }
   }, [toast]);
 
-  // 🔥 ACTIONS
+  // FIX: early returns now come AFTER all hooks
+  if (!user) return <div>Loading...</div>;
+
+  const hasAccess =
+    user.role === "SUPER_ADMIN" || user.permissions?.includes("VIEW_TENANTS");
+
+  if (!hasAccess) return <h2>Access Denied</h2>;
+
+  // ACTIONS
   const handleSuspend = async (id) => {
     if (!window.confirm("Suspend this tenant?")) return;
 
     setActionId(id);
+    setError(""); // FIX: clear stale errors before each action
     try {
       await adminService.suspendTenant(id);
       setToast({ type: "error", msg: "Tenant suspended" });
       fetchTenants();
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || err.message);
     } finally {
       setActionId(null);
     }
@@ -76,12 +76,13 @@ const Tenants = () => {
 
   const handleActivate = async (id) => {
     setActionId(id);
+    setError(""); // FIX: clear stale errors before each action
     try {
       await adminService.activateTenant(id);
       setToast({ type: "success", msg: "Tenant activated" });
       fetchTenants();
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || err.message);
     } finally {
       setActionId(null);
     }
@@ -90,32 +91,29 @@ const Tenants = () => {
   const handlePlanUpdate = async () => {
     if (!selectedPlan || !planModal) return;
 
-    // 🔒 HARD BLOCK
     if (planModal.status !== "ACTIVE") {
       setToast({
         type: "error",
-        msg: "Only ACTIVE tenants can have plans",
+        msg: "Only ACTIVE tenants can have plans updated",
       });
       return;
     }
 
     setActionId(planModal._id);
+    setError(""); // FIX: clear stale errors before each action
     try {
       await adminService.updateTenantPlan(planModal._id, selectedPlan);
-
       setToast({ type: "success", msg: "Plan updated" });
-
       setPlanModal(null);
       setSelectedPlan("");
       fetchTenants();
     } catch (err) {
-      setError(err.message);
+      setError(err.response?.data?.message || err.message);
     } finally {
       setActionId(null);
     }
   };
 
-  // 🎨 STATUS COLOR
   const getStatusClass = (status) => {
     switch (status) {
       case "ACTIVE":
@@ -129,7 +127,6 @@ const Tenants = () => {
 
   return (
     <div className="tenants-page">
-      {/* 🔔 TOAST */}
       {toast && (
         <div
           style={{
@@ -165,7 +162,6 @@ const Tenants = () => {
 
             return (
               <div className="tenant-card premium" key={t._id}>
-                {/* HEADER */}
                 <div className="tenant-header">
                   <div>
                     <h3>{t.name}</h3>
@@ -173,13 +169,11 @@ const Tenants = () => {
                       {t.status}
                     </span>
                   </div>
-
                   <div className="plan">
                     {t.subscriptionId?.plan || "No Plan"}
                   </div>
                 </div>
 
-                {/* ACTIONS */}
                 <div className="tenant-actions">
                   {t.status === "SUSPENDED" ? (
                     <button
@@ -203,13 +197,10 @@ const Tenants = () => {
                     className="btn btn-outline"
                     disabled={isInactive}
                     title={
-                      isInactive
-                        ? "Tenant must be ACTIVE to assign plan"
-                        : ""
+                      isInactive ? "Tenant must be ACTIVE to assign plan" : ""
                     }
                     onClick={() => {
                       if (isInactive) return;
-
                       setPlanModal(t);
                       setSelectedPlan(t.subscriptionId?.plan || "");
                     }}
@@ -223,7 +214,6 @@ const Tenants = () => {
         </div>
       )}
 
-      {/* 🔥 MODAL */}
       {planModal && (
         <div className="modal-overlay">
           <div className="modal premium">

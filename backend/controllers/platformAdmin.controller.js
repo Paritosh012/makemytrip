@@ -9,7 +9,7 @@ const PLANS = require("../config/plan.config");
 
 /*
 -------------------------------------------------------
-AUDIT HELPER (basic, non-overengineered)
+AUDIT HELPER
 -------------------------------------------------------
 */
 const audit = (action, userId, targetId) => {
@@ -132,7 +132,7 @@ const suspendTenant = async (req, res) => {
     tenant.status = "SUSPENDED";
     await tenant.save();
 
-    audit("SUSPEND_TENANT", req.user._id, tenantId);
+    audit("SUSPEND_TENANT", req.user.userId, tenantId);
 
     return res.status(200).json({ success: true, data: tenant });
   } catch (error) {
@@ -176,7 +176,7 @@ const activateTenant = async (req, res) => {
     tenant.status = "ACTIVE";
     await tenant.save();
 
-    audit("ACTIVATE_TENANT", req.user._id, tenantId);
+    audit("ACTIVATE_TENANT", req.user.userId, tenantId);
 
     return res.status(200).json({ success: true, data: tenant });
   } catch (error) {
@@ -190,7 +190,7 @@ const activateTenant = async (req, res) => {
 
 /*
 -------------------------------------------------------
-UPDATE TENANT PLAN (TRANSACTION FIXED)
+UPDATE TENANT PLAN
 -------------------------------------------------------
 */
 const updateTenantPlan = async (req, res) => {
@@ -202,62 +202,81 @@ const updateTenantPlan = async (req, res) => {
     const { tenantId } = req.params;
     const { plan } = req.body;
 
+    // FIX: validation errors are 400, but we need to distinguish them from
+    // unexpected server errors (which must be 500). Validate before entering
+    // the transaction so we can return early without starting one needlessly.
     if (!plan) {
-      throw new Error("Plan is required");
+      return res
+        .status(400)
+        .json({ success: false, message: "Plan is required" });
     }
 
     if (!mongoose.Types.ObjectId.isValid(tenantId)) {
-      throw new Error("Invalid tenant ID");
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid tenant ID" });
     }
 
     const normalizedPlan = plan.toUpperCase();
     const planConfig = PLANS[normalizedPlan];
 
     if (!planConfig) {
-      throw new Error("Invalid plan");
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid plan" });
     }
 
     const tenant = await Tenant.findById(tenantId).session(session);
-    if (!tenant) throw new Error("Tenant not found");
+    if (!tenant) {
+      await session.abortTransaction();
+      session.endSession();
+      return res
+        .status(404)
+        .json({ success: false, message: "Tenant not found" });
+    }
 
     const subscription = await Subscription.findOne({ tenantId }).session(
       session,
     );
-    if (!subscription) throw new Error("Subscription not found");
-
-    if (subscription.plan === normalizedPlan) {
-      throw new Error("Already on this plan");
+    if (!subscription) {
+      await session.abortTransaction();
+      session.endSession();
+      return res
+        .status(404)
+        .json({ success: false, message: "Subscription not found" });
     }
 
-    // Update subscription
+    if (subscription.plan === normalizedPlan) {
+      await session.abortTransaction();
+      session.endSession();
+      return res
+        .status(400)
+        .json({ success: false, message: "Already on this plan" });
+    }
+
     subscription.plan = normalizedPlan;
     subscription.maxAgents = planConfig.maxAgents;
     subscription.maxBookingsPerMonth = planConfig.maxBookingsPerMonth;
-
     await subscription.save({ session });
 
-    // Update tenant
     tenant.subscriptionId = subscription._id;
     await tenant.save({ session });
 
     await session.commitTransaction();
     session.endSession();
 
-    audit("UPDATE_PLAN", req.user._id, tenantId);
+    audit("UPDATE_PLAN", req.user.userId, tenantId);
 
-    return res.status(200).json({
-      success: true,
-      data: subscription,
-    });
+    return res.status(200).json({ success: true, data: subscription });
   } catch (error) {
+    // FIX: only unexpected errors reach here — always 500
     await session.abortTransaction();
     session.endSession();
 
     console.error("updateTenantPlan error:", error);
-
-    return res.status(400).json({
+    return res.status(500).json({
       success: false,
-      message: error.message || "Failed to update plan",
+      message: "Failed to update plan",
     });
   }
 };
@@ -311,6 +330,16 @@ const promoteToAdmin = async (req, res) => {
   try {
     const { userId } = req.params;
 
+    // FIX: added missing ObjectId validation (all other endpoints have this)
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID" });
+    }
+
+    // NOTE: role check is intentionally kept here as a defence-in-depth guard.
+    // The route is already protected by permissionMiddleware("MANAGE_USERS"),
+    // but promoting to ADMIN is sensitive enough to warrant an explicit check.
     if (req.user.role !== "SUPER_ADMIN") {
       return res.status(403).json({
         success: false,
@@ -327,7 +356,9 @@ const promoteToAdmin = async (req, res) => {
     }
 
     if (user.role === "ADMIN") {
-      return res.status(400).json({ success: false, message: "Already admin" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Already admin" });
     }
 
     if (user.role === "SUPER_ADMIN") {
@@ -339,10 +370,9 @@ const promoteToAdmin = async (req, res) => {
 
     user.role = "ADMIN";
     user.permissions = [];
-
     await user.save();
 
-    audit("PROMOTE_ADMIN", req.user._id, userId);
+    audit("PROMOTE_ADMIN", req.user.userId, userId);
 
     return res.status(200).json({
       success: true,
@@ -393,10 +423,9 @@ const updateUserPermissions = async (req, res) => {
     }
 
     user.permissions = permissions;
-
     await user.save();
 
-    audit("UPDATE_PERMISSIONS", req.user._id, userId);
+    audit("UPDATE_PERMISSIONS", req.user.userId, userId);
 
     return res.status(200).json({
       success: true,
@@ -418,30 +447,64 @@ SUSPEND / ACTIVATE USER
 -------------------------------------------------------
 */
 const suspendUser = async (req, res) => {
-  const user = await User.findById(req.params.id);
+  // FIX 1: wrapped entire handler in try/catch — original had none,
+  //         meaning any DB error would cause an unhandled promise rejection
+  try {
+    // FIX 2: original used req.params.id but the router registers /:userId —
+    //         destructure consistently with the route param name
+    const { userId } = req.params;
 
-  if (!user) {
-    return res.status(404).json({ message: "User not found" });
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user ID" });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
+    // FIX 3: original compared against req.user.id — the rest of the codebase
+    //         uses req.user.userId (set by authMiddleware). Using .id silently
+    //         never matches, so the self-suspend guard was effectively disabled.
+    if (user._id.toString() === req.user.userId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "You cannot suspend yourself" });
+    }
+
+    if (user.role === "SUPER_ADMIN") {
+      return res
+        .status(400)
+        .json({ success: false, message: "Cannot suspend SUPER_ADMIN" });
+    }
+
+    user.isSuspended = !user.isSuspended;
+    await user.save();
+
+    // FIX 4: audit call was missing entirely in the original
+    audit(
+      user.isSuspended ? "SUSPEND_USER" : "ACTIVATE_USER",
+      req.user.userId,
+      userId,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: user.isSuspended ? "User suspended" : "User activated",
+      data: user,
+    });
+  } catch (error) {
+    console.error("suspendUser error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update user status",
+    });
   }
-
-  // ❌ prevent self suspend
-  if (user._id.toString() === req.user.id) {
-    return res.status(400).json({ message: "You cannot suspend yourself" });
-  }
-
-  // ❌ prevent super admin suspend
-  if (user.role === "SUPER_ADMIN") {
-    return res.status(400).json({ message: "Cannot suspend SUPER_ADMIN" });
-  }
-
-  user.isSuspended = !user.isSuspended;
-
-  await user.save();
-
-  res.json({
-    message: user.isSuspended ? "User suspended" : "User activated",
-    user,
-  });
 };
 
 module.exports = {
