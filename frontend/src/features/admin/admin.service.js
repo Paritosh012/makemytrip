@@ -23,7 +23,7 @@ export const getUsers = () => api.get("/admin/users").then((r) => r.data);
 export const promoteToAdmin = (id) =>
   api.patch(`/admin/users/${id}/promote`).then((r) => r.data);
 
-export const updatePermissions = (id, permissions) =>
+export const updateUserPermissions = (id, permissions) =>
   api
     .patch(`/admin/users/${id}/permissions`, { permissions })
     .then((r) => r.data);

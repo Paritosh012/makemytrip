@@ -1,5 +1,5 @@
 import { useState } from "react";
-import adminService from "../../features/admin/admin.service";
+import * as adminService from "../../features/admin/admin.service";
 
 const ALL_PERMISSIONS = [
   "VIEW_USERS",

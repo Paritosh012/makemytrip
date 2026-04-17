@@ -2,38 +2,40 @@ const Subscription = require("../models/subscription.model");
 const Tenant = require("../models/tenant.model");
 const PLANS = require("../config/plan.config");
 const razorpay = require("../config/razorpay");
-const crypto = require("crypto");
+
+const PLAN_IDS = {
+  BASIC: "plan_SeHc38lJOsX9uV",
+  PRO: "plan_SeHcj7LrOhwABY",
+  PREMIUM: "plan_SeHdz0VMj6oA9f",
+};
 
 // =============================
-// 🔥 CREATE ORDER (STEP 1)
+// CREATE SUBSCRIPTION
 // =============================
-const createSubscriptionOrder = async (req, res) => {
+const createSubscription = async (req, res) => {
   try {
     const { plan } = req.body;
-
-    // ✅ Validate plan
-    if (!plan || !PLANS[plan]) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid plan selected",
-      });
-    }
-
     const tenantId = req.user.tenantId;
 
     if (!tenantId) {
-      return res.status(400).json({
-        success: false,
-        message: "User not linked to tenant",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "User not linked to tenant" });
     }
 
-    // ✅ Prevent duplicate active subscription
-    const existing = await Subscription.findOne({
-      tenantId,
-      status: "ACTIVE",
-    });
+    if (!plan || !PLANS[plan]) {
+      return res.status(400).json({ success: false, message: "Invalid plan" });
+    }
 
+    const planId = PLAN_IDS[plan];
+    if (!planId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Plan not configured" });
+    }
+
+    // ✅ Prevent duplicate ACTIVE
+    const existing = await Subscription.findOne({ tenantId, status: "ACTIVE" });
     if (existing) {
       return res.status(400).json({
         success: false,
@@ -41,163 +43,199 @@ const createSubscriptionOrder = async (req, res) => {
       });
     }
 
-    // ✅ Pricing (centralize this later)
-    const PLAN_PRICING = {
-      BASIC: 999,
-      PRO: 2499,
-      PREMIUM: 5999,
-    };
+    // ✅ If a PENDING sub already exists for this plan, reuse it
+    const pending = await Subscription.findOne({ tenantId, status: "PENDING" });
+    if (pending && pending.razorpaySubscriptionId) {
+      return res.json({
+        success: true,
+        subscriptionId: pending.razorpaySubscriptionId,
+        data: pending,
+      });
+    }
 
-    const amount = PLAN_PRICING[plan];
-
-    // ✅ Create Razorpay order
-    const order = await razorpay.orders.create({
-      amount: amount * 100,
-      currency: "INR",
-      receipt: `sub_${tenantId.toString().slice(-6)}_${Date.now()}`,
+    // 🔥 Create new Razorpay subscription
+    const rzpSub = await razorpay.subscriptions.create({
+      plan_id: planId,
+      customer_notify: 1,
+      total_count: 12,
     });
 
-    return res.status(200).json({
+    const { maxAgents, maxBookingsPerMonth } = PLANS[plan];
+
+    const dbSub = await Subscription.findOneAndUpdate(
+      { tenantId },
+      {
+        tenantId,
+        plan,
+        razorpaySubscriptionId: rzpSub.id,
+        status: "PENDING",
+        maxAgents,
+        maxBookingsPerMonth,
+        startDate: null,
+        endDate: null,
+      },
+      { upsert: true, new: true },
+    );
+
+    return res.json({
       success: true,
-      order,
+      subscriptionId: rzpSub.id,
+      data: dbSub,
     });
-  } catch (error) {
-    console.error("CREATE ORDER ERROR:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Order creation failed",
-    });
+  } catch (err) {
+    console.error("CREATE SUB ERROR:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to create subscription" });
   }
 };
 
 // =============================
-// 🔥 VERIFY PAYMENT (STEP 2)
+// VERIFY PAYMENT
 // =============================
 const verifySubscriptionPayment = async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, plan } =
-      req.body;
-
+    const { razorpay_subscription_id } = req.body;
     const tenantId = req.user.tenantId;
 
     if (!tenantId) {
-      return res.status(400).json({
-        success: false,
-        message: "Tenant not found",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Tenant not found" });
     }
 
-    if (!plan || !PLANS[plan]) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid plan",
-      });
-    }
-
-    // ✅ Verify Razorpay signature
-    const expected = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest("hex");
-
-    if (expected !== razorpay_signature) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment verification failed",
-      });
-    }
-
-    // ✅ Prevent duplicate activation (idempotency)
+    // ✅ Ensure subscription belongs to this tenant
     const existing = await Subscription.findOne({
       tenantId,
-      status: "ACTIVE",
+      razorpaySubscriptionId: razorpay_subscription_id,
     });
 
-    if (existing) {
+    if (!existing) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Subscription mismatch" });
+    }
+
+    // 🔥 Fetch from Razorpay to confirm payment status
+    const rzpSub = await razorpay.subscriptions.fetch(razorpay_subscription_id);
+    console.log("Razorpay status:", rzpSub.status);
+
+    if (!rzpSub) {
       return res.status(400).json({
         success: false,
-        message: "Subscription already active",
+        message: "Subscription not found on Razorpay",
       });
     }
 
-    // ✅ Plan config
-    const planConfig = PLANS[plan];
+    const validStatuses = ["active", "authenticated"];
+    if (!validStatuses.includes(rzpSub.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Payment not completed. Razorpay status: ${rzpSub.status}`,
+      });
+    }
 
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setMonth(endDate.getMonth() + 1);
 
-    // ✅ Create or update subscription
-    const subscription = await Subscription.findOneAndUpdate(
+    // ✅ Activate subscription
+    const updatedSub = await Subscription.findOneAndUpdate(
       { tenantId },
-      {
-        plan,
-        maxAgents: planConfig.maxAgents,
-        maxBookingsPerMonth: planConfig.maxBookingsPerMonth,
-        startDate,
-        endDate,
-        status: "ACTIVE",
-      },
-      { returnDocument: "after", upsert: true },
+      { status: "ACTIVE", startDate, endDate },
+      { new: true },
     );
 
-    // ✅ Activate tenant
-    await Tenant.findByIdAndUpdate(tenantId, {
+    if (!updatedSub) {
+      throw new Error("Subscription update failed");
+    }
+
+    // ✅ Update tenant
+    const tenant = await Tenant.findByIdAndUpdate(tenantId, {
       status: "ACTIVE",
-      subscriptionId: subscription._id,
+      subscriptionId: updatedSub._id,
     });
 
-    return res.status(200).json({
+    if (!tenant) {
+      // rollback
+      await Subscription.findOneAndUpdate({ tenantId }, { status: "PENDING" });
+      throw new Error("Tenant update failed");
+    }
+
+    return res.json({
       success: true,
-      message: "Subscription activated successfully",
-      data: subscription,
+      message: "Subscription activated",
+      data: updatedSub,
     });
-  } catch (error) {
-    console.error("VERIFY PAYMENT ERROR:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Payment verification failed",
-    });
+  } catch (err) {
+    console.error("VERIFY ERROR:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: err.message || "Verification failed" });
   }
 };
 
 // =============================
-// 🔥 GET CURRENT SUBSCRIPTION
+// GET SUBSCRIPTION
 // =============================
 const getMySubscription = async (req, res) => {
   try {
     const tenantId = req.user.tenantId;
 
     if (!tenantId) {
-      return res.status(400).json({
-        success: false,
-        message: "No tenant associated",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "No tenant found" });
     }
 
-    const subscription = await Subscription.findOne({
-      tenantId,
-      status: "ACTIVE",
-    });
+    const subscription = await Subscription.findOne({ tenantId });
 
-    return res.status(200).json({
-      success: true,
-      data: subscription || null,
-    });
-  } catch (error) {
-    console.error("GET SUBSCRIPTION ERROR:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch subscription",
-    });
+    return res.json({ success: true, data: subscription || null });
+  } catch (err) {
+    console.error("GET SUB ERROR:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch subscription" });
   }
 };
 
+const getSubscriptionHistory = async (req, res) => {
+  const tenantId = req.user.tenantId;
+
+  const subs = await Subscription.find({ tenantId }).sort({ createdAt: -1 });
+
+  res.json({ success: true, data: subs });
+};
+// POST /subscriptions/cancel
+const cancelSubscription = async (req, res) => {
+  const tenantId = req.user.tenantId;
+
+  const sub = await Subscription.findOne({
+    tenantId,
+    status: "ACTIVE",
+  });
+
+  if (!sub) {
+    return res.status(400).json({
+      success: false,
+      message: "No active subscription",
+    });
+  }
+
+  // 🔥 Cancel in Razorpay
+  await razorpay.subscriptions.cancel(sub.razorpaySubscriptionId);
+
+  sub.status = "CANCELLED";
+  sub.cancelledAt = new Date();
+  await sub.save();
+
+  res.json({ success: true, message: "Subscription cancelled" });
+};
+
 module.exports = {
-  createSubscriptionOrder,
+  createSubscription,
   verifySubscriptionPayment,
   getMySubscription,
+  getSubscriptionHistory,
+  cancelSubscription,
 };

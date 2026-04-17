@@ -15,7 +15,7 @@ export const updatePackage = (id, data) =>
 
 export const deletePackage = (id) =>
   api.delete(`/packages/${id}`).then((res) => res.data);
-
+ 
 // USER (public)
 export const getPublicPackages = () =>
   api.get("/packages/public").then((res) => res.data);

@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { useAuth } from "../../hooks/useAuth";
 import { logoutUser } from "../../features/auth/authSlice";
@@ -43,23 +43,28 @@ const navConfig = {
 const Sidebar = () => {
   const { user } = useAuth();
   const dispatch = useDispatch();
-  const navigate = useNavigate();
 
-  // 🚨 SAFETY: no user yet
+  // ✅ DON'T render until auth is ready
   if (!user) return null;
 
   let links = navConfig[user.role] || [];
 
-  // 🔥 Apply permission filtering (only for ADMIN)
+  // ✅ Permission filtering only for ADMIN
   if (user.role === "ADMIN") {
     links = links.filter(
       (link) => !link.permission || user.permissions?.includes(link.permission),
     );
   }
 
+  // 🔥 CLEAN LOGOUT (NO NAVIGATION HERE)
   const handleLogout = async () => {
-    await dispatch(logoutUser());
-    navigate("/login");
+    try {
+      await dispatch(logoutUser()).unwrap();
+      // ❌ No navigate here
+      // ProtectedRoute will handle redirect
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
   };
 
   return (
@@ -95,13 +100,28 @@ const Sidebar = () => {
 
       {/* USER INFO */}
       <div style={{ marginTop: "auto", padding: "24px 24px 0" }}>
-        <div style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
-          <div style={{ fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>
+        <div
+          style={{
+            borderTop: "1px solid var(--border)",
+            paddingTop: 16,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 13,
+              color: "var(--muted)",
+              marginBottom: 4,
+            }}
+          >
             {user.name}
           </div>
 
           <div
-            style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}
+            style={{
+              fontSize: 12,
+              color: "var(--muted)",
+              marginBottom: 12,
+            }}
           >
             {user.email}
           </div>

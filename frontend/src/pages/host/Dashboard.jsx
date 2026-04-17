@@ -115,7 +115,7 @@ const HostDashboard = () => {
               View All Packages
             </Link>
 
-            <Link to="/host/subscription" className="btn btn-secondary">
+            <Link to="/host/manage-subscription" className="btn btn-secondary">
               Manage Subscription
             </Link>
           </div>

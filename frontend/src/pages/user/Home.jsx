@@ -9,7 +9,6 @@ const formatDate = (d) => {
   if (!d) return "—";
   const date = new Date(d);
   if (isNaN(date)) return "—";
-
   return date.toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
@@ -28,39 +27,31 @@ const Home = () => {
   const [bookingPkg, setBookingPkg] = useState(null);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState("");
-
   const [seats, setSeats] = useState(1);
 
-  // ======================
-  // FETCH PACKAGES
-  // ======================
   useEffect(() => {
     setLoading(true);
     setError("");
 
     packageService
       .getPublicPackages()
-      .then((res) => {
-        setPackages(res || []);
-      })
+      .then((res) => setPackages(res.data || []))
       .catch((err) => {
-        setError(err.response?.data?.message || "Failed to load packages");
+        setError(
+          err.response?.data?.message ||
+            err.message ||
+            "Failed to load packages",
+        );
       })
       .finally(() => setLoading(false));
   }, []);
 
-  // ======================
-  // OPEN BOOKING MODAL
-  // ======================
   const handleBook = (pkg) => {
     setBookingPkg(pkg);
-    setSeats(1); // reset
+    setSeats(1);
     setBookingError("");
   };
 
-  // ======================
-  // CONFIRM BOOKING
-  // ======================
   const confirmBook = async () => {
     if (!bookingPkg) return;
 
@@ -73,6 +64,7 @@ const Home = () => {
         seats,
       });
 
+      // res is already r.data from service, so booking is res.data
       dispatch(
         setPendingBooking({
           bookingId: res.data._id,
@@ -81,16 +73,17 @@ const Home = () => {
       );
 
       setBookingPkg(null);
-
-      // 🔥 Better UX feedback
-      alert("Booking created. Complete payment to confirm.");
-
       navigate("/bookings");
     } catch (err) {
-      console.log("BOOKING ERROR:", err.response?.data);
-      setBookingError(
-        err.response?.data?.message || err.message || "Booking failed",
-      );
+      // ✅ Correctly extracts message at every level
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.message ||
+        "Booking failed";
+
+      console.error("BOOKING ERROR:", err.response?.data || err);
+      setBookingError(msg);
     } finally {
       setBookingLoading(false);
     }
@@ -170,9 +163,7 @@ const Home = () => {
         </div>
       )}
 
-      {/* ======================
-          BOOKING MODAL
-      ====================== */}
+      {/* BOOKING MODAL */}
       {bookingPkg && (
         <div className="modal-overlay" onClick={() => setBookingPkg(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -183,7 +174,6 @@ const Home = () => {
               <p>📍 {bookingPkg.destination}</p>
               <p>₹{bookingPkg.price?.toLocaleString("en-IN")}</p>
 
-              {/* SEAT CONTROL */}
               <div style={{ marginTop: 16 }}>
                 <label style={{ fontWeight: 500 }}>Select Seats</label>
 
@@ -197,7 +187,7 @@ const Home = () => {
                 >
                   <button
                     className="btn btn-secondary btn-sm"
-                    onClick={() => setSeats((prev) => Math.max(1, prev - 1))}
+                    onClick={() => setSeats((p) => Math.max(1, p - 1))}
                     disabled={seats <= 1}
                   >
                     −
@@ -216,8 +206,8 @@ const Home = () => {
                   <button
                     className="btn btn-secondary btn-sm"
                     onClick={() =>
-                      setSeats((prev) =>
-                        Math.min(bookingPkg.seatsAvailable, prev + 1),
+                      setSeats((p) =>
+                        Math.min(bookingPkg.seatsAvailable, p + 1),
                       )
                     }
                     disabled={seats >= bookingPkg.seatsAvailable}
@@ -236,11 +226,11 @@ const Home = () => {
               </div>
             </div>
 
+            {/* ✅ Error shown here with real message */}
             {bookingError && (
               <div className="alert alert-error">{bookingError}</div>
             )}
 
-            {/* 🔥 UX IMPROVEMENT */}
             <div className="alert alert-info">
               Booking will be created first. Payment comes next.
             </div>

@@ -6,33 +6,36 @@ const subscriptionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Tenant",
       required: true,
-      unique: true,
     },
     plan: {
       type: String,
       required: true,
       enum: ["BASIC", "PRO", "PREMIUM"],
     },
-    maxAgents: { 
+    maxAgents: {
       type: Number,
-      required: true,
+      default: null,
     },
     maxBookingsPerMonth: {
       type: Number,
-      required: true,
+      default: null,
     },
     startDate: {
       type: Date,
-      required: true,
-    }, 
+      default: null,
+    },
     endDate: {
       type: Date,
-      required: true,
+      default: null,
     },
     status: {
       type: String,
-      enum: ["ACTIVE", "EXPIRED"],
-      default: "ACTIVE",
+      enum: ["PENDING", "ACTIVE", "CANCELLED", "EXPIRED"],
+      default: "PENDING",
+    },
+    razorpaySubscriptionId: {
+      type: String,
+      default: null,
     },
   },
   { timestamps: true },

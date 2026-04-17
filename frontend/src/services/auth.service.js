@@ -1,5 +1,5 @@
 import api from '../app/api'
-
+ 
 export const register = (data) =>
   api.post('/auth/register', data).then((r) => r.data)
 

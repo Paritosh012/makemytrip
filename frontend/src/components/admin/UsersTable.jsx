@@ -1,4 +1,4 @@
-import adminService from "../../features/admin/admin.service";
+import * as adminService from "../../features/admin/admin.service";
 
 export default function UsersTable({
   users,

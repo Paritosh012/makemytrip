@@ -3,15 +3,16 @@ import { useSelector } from "react-redux";
 import * as bookingService from "../../services/booking.service";
 import * as paymentService from "../../services/payment.service";
 
-// ======================
-// HELPERS
-// ======================
-const formatDate = (d) =>
-  new Date(d).toLocaleDateString("en-IN", {
+const formatDate = (d) => {
+  if (!d) return "—";
+  const date = new Date(d);
+  if (isNaN(date)) return "—";
+  return date.toLocaleDateString("en-IN", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
+};
 
 const statusBadge = (status) => {
   const map = {
@@ -19,43 +20,41 @@ const statusBadge = (status) => {
     CONFIRMED: "badge-green",
     CANCELLED: "badge-red",
   };
-  return <span className={`badge ${map[status]}`}>{status}</span>;
+  return (
+    <span className={`badge ${map[status] || "badge-yellow"}`}>{status}</span>
+  );
 };
 
-// 🔥 FIXED PAYMENT BADGE (clear + honest)
 const paymentBadge = (status) => {
-  const map = {
+  const colorMap = {
     SUCCESS: "badge-green",
     FAILED: "badge-red",
     REFUNDED: "badge-blue",
     PENDING: "badge-yellow",
   };
-
   const labelMap = {
     SUCCESS: "PAID",
     FAILED: "FAILED",
-    REFUNDED: "REFUNDED (MOCK)",
+    REFUNDED: "REFUNDED",
     PENDING: "PENDING",
   };
-
-  return <span className={`badge ${map[status]}`}>{labelMap[status]}</span>;
+  return (
+    <span className={`badge ${colorMap[status] || "badge-yellow"}`}>
+      {labelMap[status] || status}
+    </span>
+  );
 };
 
 const loadRazorpay = () =>
   new Promise((resolve) => {
     if (window.Razorpay) return resolve(true);
-
     const script = document.createElement("script");
     script.src = "https://checkout.razorpay.com/v1/checkout.js";
     script.onload = () => resolve(true);
     script.onerror = () => resolve(false);
-
     document.body.appendChild(script);
   });
 
-// ======================
-// COMPONENT
-// ======================
 const BookingHistory = () => {
   const { user } = useSelector((s) => s.auth);
 
@@ -65,19 +64,16 @@ const BookingHistory = () => {
   const [payingId, setPayingId] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
 
-  // ======================
-  // FETCH
-  // ======================
   const fetchBookings = async () => {
     try {
       setLoading(true);
       const res = await bookingService.getBookings();
-
-      if (!res.success) throw new Error("Failed to fetch");
-
+      if (!res.success) throw new Error("Failed to fetch bookings");
       setBookings(res.data || []);
     } catch (err) {
-      setError(err.message);
+      setError(
+        err.response?.data?.message || err.message || "Failed to load bookings",
+      );
     } finally {
       setLoading(false);
     }
@@ -87,24 +83,27 @@ const BookingHistory = () => {
     fetchBookings();
   }, []);
 
-  // ======================
-  // PAYMENT
-  // ======================
   const handlePay = async (booking) => {
     setPayingId(booking._id);
+    setError("");
 
     try {
       const loaded = await loadRazorpay();
-      if (!loaded) throw new Error("Razorpay failed");
+      if (!loaded) throw new Error("Razorpay SDK failed to load");
 
-      const { order } = await paymentService.createOrder(booking._id);
+      // res is already r.data → has { order }
+      const res = await paymentService.createOrder(booking._id);
+
+      if (!res?.order) throw new Error("Invalid order response from server");
+
+      const { order } = res;
 
       const rzp = new window.Razorpay({
         key: import.meta.env.VITE_RAZORPAY_KEY_ID,
         amount: order.amount,
         currency: order.currency,
         name: "Travel SaaS",
-        description: booking.packageId?.title,
+        description: booking.packageId?.title || "Travel Booking",
         order_id: order.id,
 
         prefill: {
@@ -113,48 +112,60 @@ const BookingHistory = () => {
         },
 
         handler: async (response) => {
-          await paymentService.verifyPayment(response);
-          fetchBookings();
+          try {
+            // ✅ verifyPayment returns r.data already
+            await paymentService.verifyPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            });
+            await fetchBookings();
+          } catch (err) {
+            setError(
+              err.response?.data?.message ||
+                err.message ||
+                "Payment verification failed",
+            );
+          } finally {
+            setPayingId(null);
+          }
+        },
+
+        modal: {
+          ondismiss: () => setPayingId(null),
         },
       });
 
       rzp.open();
     } catch (err) {
-      setError(err.message);
-    } finally {
+      setError(err.response?.data?.message || err.message || "Payment failed");
       setPayingId(null);
     }
   };
 
-  // ======================
-  // CANCEL (FIXED)
-  // ======================
   const handleCancel = async (booking) => {
     const confirmMsg =
       booking.paymentStatus === "SUCCESS"
-        ? "Cancel this booking? (Refund will be simulated)"
+        ? "Cancel this booking? A refund will be simulated."
         : "Cancel this booking?";
 
     if (!window.confirm(confirmMsg)) return;
 
+    setActionLoading(booking._id);
+    setError("");
+
     try {
-      setActionLoading(booking._id);
-
       await bookingService.cancelBooking(booking._id);
-
-      alert("Booking cancelled successfully");
-
-      fetchBookings();
+      await fetchBookings();
     } catch (err) {
-      setError(err.message);
+      setError(
+        err.response?.data?.message || err.message || "Cancellation failed",
+      );
     } finally {
       setActionLoading(null);
     }
   };
 
-  // ======================
-  // UI STATES
-  // ======================
   if (loading) {
     return (
       <div className="loader-wrap">
@@ -163,18 +174,16 @@ const BookingHistory = () => {
     );
   }
 
-  if (bookings.length === 0) {
+  if (!loading && bookings.length === 0) {
     return (
       <div className="empty-state">
+        <div className="icon">🧳</div>
         <h2>No Bookings Yet</h2>
-        <p>Go book something instead of staring at this.</p>
+        <p>Browse packages and book your first trip!</p>
       </div>
     );
   }
 
-  // ======================
-  // MAIN UI
-  // ======================
   return (
     <div>
       <div className="page-header">
@@ -200,36 +209,30 @@ const BookingHistory = () => {
 
             <tbody>
               {bookings.map((b) => {
-                // 🔥 FIXED LOGIC
+                const canPay =
+                  b.status === "PENDING" && b.paymentStatus !== "SUCCESS";
+
                 const canCancel =
                   ["PENDING", "CONFIRMED"].includes(b.status) &&
                   b.paymentStatus !== "REFUNDED";
-
-                const canPay =
-                  b.status === "PENDING" && b.paymentStatus !== "SUCCESS";
 
                 return (
                   <tr key={b._id}>
                     <td>
                       <div style={{ fontWeight: 600 }}>
-                        {b.packageId?.title}
+                        {b.packageId?.title || "—"}
                       </div>
-
                       <div className="text-muted">
-                        📍 {b.packageId?.destination}
+                        📍 {b.packageId?.destination || "—"}
                       </div>
-
                       <div className="text-muted" style={{ fontSize: 12 }}>
                         🪑 {b.seats} seats
                       </div>
                     </td>
 
-                    <td>₹{b.price?.toLocaleString()}</td>
-
+                    <td>₹{b.price?.toLocaleString("en-IN") || "—"}</td>
                     <td>{statusBadge(b.status)}</td>
-
                     <td>{paymentBadge(b.paymentStatus)}</td>
-
                     <td>{formatDate(b.createdAt)}</td>
 
                     <td>
@@ -253,7 +256,7 @@ const BookingHistory = () => {
                             {actionLoading === b._id
                               ? "Processing..."
                               : b.paymentStatus === "SUCCESS"
-                                ? "Cancel (Refund Simulated)"
+                                ? "Cancel & Refund"
                                 : "Cancel"}
                           </button>
                         )}

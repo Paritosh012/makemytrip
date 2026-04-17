@@ -22,6 +22,7 @@ const Applications = () => {
   const [error, setError] = useState("");
   const [actionId, setActionId] = useState(null);
   const [filter, setFilter] = useState("");
+  const [toast, setToast] = useState(null);
 
   // 🔥 PERMISSION CHECK (FIXED)
   if (
@@ -50,13 +51,21 @@ const Applications = () => {
     if (user) fetchApplications();
   }, [filter, user]);
 
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
   const handleApprove = async (id) => {
     setActionId(id);
     try {
       await hostService.approveApplication(id);
+      setToast({ type: "success", message: "Application approved" });
       fetchApplications();
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      setToast({ type: "error", message: err.message });
     } finally {
       setActionId(null);
     }
@@ -68,9 +77,10 @@ const Applications = () => {
     setActionId(id);
     try {
       await hostService.rejectApplication(id);
+      setToast({ type: "error", message: "Application rejected" });
       fetchApplications();
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      setToast({ type: "error", message: err.message });
     } finally {
       setActionId(null);
     }
@@ -78,6 +88,23 @@ const Applications = () => {
 
   return (
     <div>
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            top: 20,
+            right: 20,
+            zIndex: 9999,
+            padding: "12px 18px",
+            borderRadius: "8px",
+            background: toast.type === "success" ? "#16a34a" : "#dc2626",
+            color: "#fff",
+            boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+          }}
+        >
+          {toast.message}
+        </div>
+      )}
       <div className="page-header">
         <h1>Host Applications</h1>
         <p>Review and process incoming host applications</p>
@@ -129,19 +156,23 @@ const Applications = () => {
                 <td>
                   {app.status === "PENDING" && (
                     <>
-                      <button
-                        onClick={() => handleApprove(app._id)}
-                        disabled={actionId === app._id}
-                      >
-                        Approve
-                      </button>
+                      <div className="d-flex gap-2">
+                        <button
+                          className="btn btn-success btn-sm"
+                          disabled={actionId === app._id}
+                          onClick={() => handleApprove(app._id)}
+                        >
+                          {actionId === app._id ? "Processing..." : "Approve"}
+                        </button>
 
-                      <button
-                        onClick={() => handleReject(app._id)}
-                        disabled={actionId === app._id}
-                      >
-                        Reject
-                      </button>
+                        <button
+                          className="btn btn-outline-danger btn-sm"
+                          disabled={actionId === app._id}
+                          onClick={() => handleReject(app._id)}
+                        >
+                          {actionId === app._id ? "Processing..." : "Reject"}
+                        </button>
+                      </div>
                     </>
                   )}
                 </td>

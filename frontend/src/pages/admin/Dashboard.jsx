@@ -12,6 +12,8 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionId, setActionId] = useState(null);
+  const [filter, setFilter] = useState("");
+  const [toast, setToast] = useState(null);
 
   // 🔥 PERMISSION CHECK (FIXED)
   if (
@@ -23,19 +25,33 @@ const AdminDashboard = () => {
     return <h2>Access Denied</h2>;
   }
 
-  const fetchData = async () => {
+  const fetchTenants = async () => {
     setLoading(true);
     setError("");
 
     try {
-      const [appData, tenantData] = await Promise.all([
-        hostService.getApplications("PENDING"),
-        adminService.getTenants(),
-      ]);
+      const data = await adminService.getTenants();
 
-      // ✅ FIXED RESPONSE HANDLING
-      setApplications(appData || []);
-      setTenants(tenantData || []);
+      const tenantsArr = Array.isArray(data)
+        ? data
+        : data?.data?.tenants || data?.data || data?.tenants || [];
+
+      setTenants(tenantsArr);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchApplications = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const data = await hostService.getApplications(filter || undefined);
+
+      setApplications(data.data || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     } finally {
@@ -44,40 +60,75 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
-    if (user) fetchData();
+    if (user) {
+      fetchTenants();
+      fetchApplications();
+    }
   }, [user]);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const handleApprove = async (id) => {
     setActionId(id);
     try {
       await hostService.approveApplication(id);
-      fetchData();
+      setToast({ type: "success", message: "Application approved" });
+      fetchApplications();
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      setToast({ type: "error", message: err.message });
     } finally {
       setActionId(null);
     }
   };
 
   const handleReject = async (id) => {
+    if (!window.confirm("Reject this application?")) return;
+
     setActionId(id);
     try {
       await hostService.rejectApplication(id);
-      fetchData();
+      setToast({ type: "error", message: "Application rejected" });
+      fetchApplications();
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      setToast({ type: "error", message: err.message });
     } finally {
       setActionId(null);
     }
   };
 
+  const pendingApplications = applications.filter(
+    (app) => app.status === "PENDING",
+  );
+
   // 🔥 SAFE CALCULATIONS
-  const pending = applications.length;
+  const pending = pendingApplications.length;
   const active = tenants.filter((t) => t.status === "ACTIVE").length;
   const suspended = tenants.filter((t) => t.status === "SUSPENDED").length;
 
   return (
     <div>
+      {toast && (
+        <div
+          style={{
+            position: "fixed",
+            top: 20,
+            right: 20,
+            zIndex: 9999,
+            padding: "12px 18px",
+            borderRadius: "8px",
+            background: toast.type === "success" ? "#16a34a" : "#dc2626",
+            color: "#fff",
+            boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+          }}
+        >
+          {toast.message}
+        </div>
+      )}
       <div className="page-header">
         <h1>Admin Dashboard</h1>
         <p>Platform overview and host management</p>
@@ -124,27 +175,34 @@ const AdminDashboard = () => {
 
           {loading ? (
             <div>Loading...</div>
-          ) : applications.length === 0 ? (
+          ) : pendingApplications.length === 0 ? (
             <p>No pending applications</p>
           ) : (
-            applications.slice(0, 5).map((app) => (
+            pendingApplications.slice(0, 5).map((app) => (
               <div key={app._id}>
-                <div>{app.agencyName}</div>
-                <div>{app.userId?.email}</div>
+                {app.status === "PENDING" && (
+                  <>
+                    <div>{app.agencyName}</div>
+                    <div>{app.userId?.email}</div>
+                    <div className="d-flex gap-2">
+                      <button
+                        className="btn btn-success btn-sm"
+                        disabled={actionId === app._id}
+                        onClick={() => handleApprove(app._id)}
+                      >
+                        {actionId === app._id ? "Processing..." : "Approve"}
+                      </button>
 
-                <button
-                  onClick={() => handleApprove(app._id)}
-                  disabled={actionId === app._id}
-                >
-                  Approve
-                </button>
-
-                <button
-                  onClick={() => handleReject(app._id)}
-                  disabled={actionId === app._id}
-                >
-                  Reject
-                </button>
+                      <button
+                        className="btn btn-outline-danger btn-sm"
+                        disabled={actionId === app._id}
+                        onClick={() => handleReject(app._id)}
+                      >
+                        {actionId === app._id ? "Processing..." : "Reject"}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ))
           )}

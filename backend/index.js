@@ -79,17 +79,22 @@ ROUTES
 -------------------------------------------------------
 */
 
-// Public/Auth
-app.use("/api/auth", authLimiter, authRoutes);
+// AUTH (no limiter on /me)
+app.use("/api/auth", authRoutes);
 
-// Admin (🔥 FIXED)
-app.use("/api/admin", globalLimiter, adminRoutes);
+// Apply limiter ONLY to sensitive endpoints
+app.use("/api/auth/login", authLimiter);
+app.use("/api/auth/register", authLimiter);
+app.use("/api/auth/verify-otp", authLimiter);
 
-// Domain routes
-app.use("/api/host-applications", globalLimiter, hostApplicationRoutes);
-app.use("/api/packages", globalLimiter, packageRoutes);
-app.use("/api/subscriptions", globalLimiter, subscriptionRoutes);
-app.use("/api/bookings", globalLimiter, bookingRoutes);
+// NO limiter on normal app routes
+app.use("/api/admin", adminRoutes);
+app.use("/api/host-applications", hostApplicationRoutes);
+app.use("/api/packages", packageRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/bookings", bookingRoutes);
+
+// Optional limiter for payments
 app.use("/api/payments", globalLimiter, paymentRoutes);
 
 /*

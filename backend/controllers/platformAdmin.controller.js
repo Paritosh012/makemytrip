@@ -418,41 +418,30 @@ SUSPEND / ACTIVATE USER
 -------------------------------------------------------
 */
 const suspendUser = async (req, res) => {
-  try {
-    const { userId } = req.params;
+  const user = await User.findById(req.params.id);
 
-    const user = await User.findById(userId);
-
-    if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    }
-
-    if (user.role === "SUPER_ADMIN") {
-      return res.status(403).json({
-        success: false,
-        message: "Cannot modify SUPER_ADMIN",
-      });
-    }
-
-    user.isSuspended = !user.isSuspended;
-
-    await user.save();
-
-    audit("TOGGLE_USER_STATUS", req.user._id, userId);
-
-    return res.status(200).json({
-      success: true,
-      message: `User ${user.isSuspended ? "suspended" : "activated"}`,
-    });
-  } catch (error) {
-    console.error("suspendUser error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update user status",
-    });
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
   }
+
+  // ❌ prevent self suspend
+  if (user._id.toString() === req.user.id) {
+    return res.status(400).json({ message: "You cannot suspend yourself" });
+  }
+
+  // ❌ prevent super admin suspend
+  if (user.role === "SUPER_ADMIN") {
+    return res.status(400).json({ message: "Cannot suspend SUPER_ADMIN" });
+  }
+
+  user.isSuspended = !user.isSuspended;
+
+  await user.save();
+
+  res.json({
+    message: user.isSuspended ? "User suspended" : "User activated",
+    user,
+  });
 };
 
 module.exports = {
