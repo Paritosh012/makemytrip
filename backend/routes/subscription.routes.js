@@ -14,8 +14,7 @@ const role = require("../middlewares/role.middleware");
 
 router.post("/create", auth, role("HOST"), createSubscription);
 router.post("/verify", auth, role("HOST"), verifySubscriptionPayment);
-router.get("/me", auth, role("HOST"), getMySubscription);
-router.get("/history", auth, role("HOST"), getSubscriptionHistory);
-router.get("/cencel", auth, role("HOST"), cancelSubscription);
+router.get("/me", auth, role("HOST"), getMySubscription); 
+router.post("/cancel", auth, role("HOST"), cancelSubscription);
 
 module.exports = router;

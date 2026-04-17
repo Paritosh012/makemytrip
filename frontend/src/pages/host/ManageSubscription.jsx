@@ -40,7 +40,6 @@ const ManageSubscription = () => {
 
       const [curRes, histRes] = await Promise.all([
         subscriptionService.getMySubscription(),
-        subscriptionService.getHistory(),
       ]);
 
       setCurrent(curRes?.data || null);
@@ -117,7 +116,7 @@ const ManageSubscription = () => {
             </div>
 
             <div className="flex-between">
-              <span className="text-muted">End Date</span>
+              <span className="text-muted">Next Cycle Date</span>
               <span>{formatDate(current.endDate)}</span>
             </div>
 
@@ -137,41 +136,6 @@ const ManageSubscription = () => {
                 {actionLoading ? "Cancelling..." : "Cancel Subscription"}
               </button>
             )}
-          </div>
-        )}
-      </div>
-
-      {/* ================= HISTORY ================= */}
-      <div className="card">
-        <div className="card-header">
-          <h2>Subscription History</h2>
-        </div>
-
-        {history.length === 0 ? (
-          <div className="text-muted">No past subscriptions</div>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Plan</th>
-                  <th>Status</th>
-                  <th>Start</th>
-                  <th>End</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {history.map((sub) => (
-                  <tr key={sub._id}>
-                    <td>{sub.plan}</td>
-                    <td>{statusBadge(sub.status)}</td>
-                    <td>{formatDate(sub.startDate)}</td>
-                    <td>{formatDate(sub.endDate)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         )}
       </div>

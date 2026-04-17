@@ -1,16 +1,38 @@
 import api from "../app/api";
 
-export const getMySubscription = () =>
-  api.get("/subscriptions/me").then((r) => r.data);
+// ================= GET =================
 
-export const createSubscription = (plan) =>
-  api.post("/subscriptions/create", { plan }).then((r) => r.data);
+export const getMySubscription = async () => {
+  const res = await api.get("/subscriptions/me");
+  return res.data;
+};
+ 
 
-export const verifySubscriptionPayment = (data) =>
-  api.post("/subscriptions/verify", data).then((r) => r.data);
+// ================= CREATE =================
 
-export const getHistory = () =>
-  api.get("/subscriptions/history").then((r) => r.data);
+export const createSubscription = async (plan) => {
+  const res = await api.post("/subscriptions/create", { plan });
+  return res.data;
+};
 
-export const cancelSubscription = () =>
-  api.post("/subscriptions/cancel").then((r) => r.data);
+// ================= VERIFY =================
+
+export const verifySubscriptionPayment = async (data) => {
+  const res = await api.post("/subscriptions/verify", data);
+  return res.data;
+};
+
+// ================= CANCEL =================
+
+export const cancelSubscription = async () => {
+  try {
+    const res = await api.post("/subscriptions/cancel");
+    return res.data;
+  } catch (err) {
+    console.error(
+      "Cancel subscription failed:",
+      err.response?.data || err.message,
+    );
+    throw err;
+  }
+};
