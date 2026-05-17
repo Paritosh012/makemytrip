@@ -28,6 +28,7 @@ SECURITY + MIDDLEWARE
 const allowedOrigins = [
   "http://localhost:5173",
   "https://makemytrip-frontend-kvdy.onrender.com",
+  "https://makemytrip-phi.vercel.app/",
 ];
 
 app.use(
