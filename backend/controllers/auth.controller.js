@@ -11,6 +11,8 @@ const { sendEmail } = require("../utils/email");
 // ================= REGISTER =================
 
 const register = async (req, res) => {
+  console.log("EMAIL_USER:", process.env.EMAIL_USER);
+  console.log("EMAIL_PASS:", process.env.EMAIL_PASS ? "SET" : "MISSING");
   try {
     const { name, email } = req.body;
 
