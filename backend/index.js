@@ -1,5 +1,3 @@
-require("dotenv").config({ override: false });
-
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
