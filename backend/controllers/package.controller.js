@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Package = require("../models/package.model");
+const archiveExpiredPackages = require("../utils/archiveExpiredPackages");
 
 const createPackage = async (req, res) => {
   try {
@@ -126,6 +127,8 @@ const createPackage = async (req, res) => {
 
 const getPackages = async (req, res) => {
   try {
+    await archiveExpiredPackages();
+
     const { tenantId } = req.user;
 
     const page = Math.max(Number(req.query.page) || 1, 1);
@@ -134,7 +137,7 @@ const getPackages = async (req, res) => {
 
     const filter = {
       tenantId,
-      status: { $ne: "ARCHIVED" },
+      status: { $ne: "ARCHIVED" }, // This line removes Archived Packages From Search
     };
 
     const [packages, totalPackages] = await Promise.all([
@@ -172,6 +175,8 @@ const getPackages = async (req, res) => {
 
 const getPackage = async (req, res) => {
   try {
+    await archiveExpiredPackages();
+
     const { tenantId } = req.user;
     const { id } = req.params;
 
@@ -339,6 +344,8 @@ const deletePackage = async (req, res) => {
 
 const getPublicPackages = async (req, res) => {
   try {
+    await archiveExpiredPackages();
+
     const packages = await Package.find({
       status: "ACTIVE",
       seatsAvailable: { $gt: 0 },
