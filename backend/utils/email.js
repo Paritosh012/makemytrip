@@ -1,16 +1,18 @@
 const nodemailer = require("nodemailer");
 
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com", // explicit host instead of service:"gmail"
+  port: 587, // ← 587 works on Render, 465 is blocked
+  secure: false, // false for 587 (STARTTLS)
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS, // App password (NOT your real password)
+    pass: process.env.EMAIL_PASS,
   },
 });
 
 const sendEmail = async (to, subject, html) => {
   await transporter.sendMail({
-    from: `"MakeMyTrip Clone" <${process.env.EMAIL_USER}>`,
+    from: `"TravelSaaS" <${process.env.EMAIL_USER}>`,
     to,
     subject,
     html,
