@@ -38,34 +38,34 @@ const register = async (req, res) => {
       await user.save();
     }
 
-    const otp = generateOtp();
-    const otpHash = await hashOtp(otp);
+    // const otp = generateOtp();
+    // const otpHash = await hashOtp(otp);
 
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+    // const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-    await OTP.findOneAndUpdate(
-      { userId: user._id },
-      {
-        otpHash,
-        expiresAt,
-        attempts: 0,
-        lastSentAt: new Date(),
-      },
-      { upsert: true },
-    );
+    // await OTP.findOneAndUpdate(
+    //   { userId: user._id },
+    //   {
+    //     otpHash,
+    //     expiresAt,
+    //     attempts: 0,
+    //     lastSentAt: new Date(),
+    //   },
+    //   { upsert: true },
+    // );
 
-    await sendEmail(
-      user.email,
-      "Your OTP Code",
-      `<h1>Verify Your Email</h1>
-       <p>Your OTP code is:</p>
-       <h2 style="color:blue;">${otp}</h2>
-       <p>This OTP expires in 5 minutes.</p>`,
-    );
+    // await sendEmail(
+    //   user.email,
+    //   "Your OTP Code",
+    //   `<h1>Verify Your Email</h1>
+    //    <p>Your OTP code is:</p>
+    //    <h2 style="color:blue;">${otp}</h2>
+    //    <p>This OTP expires in 5 minutes.</p>`,
+    // );
 
     return res.status(200).json({
       success: true,
-      message: "OTP sent successfully",
+      message: "User successfully registered",
     });
   } catch (error) {
     console.error("Register error:", error);
@@ -239,11 +239,14 @@ const setPassword = async (req, res) => {
 
     const user = await User.findOne({ email: normalizedEmail });
 
-    if (!user || !user.isVerified) {
+    if (!user) {
       return res.status(400).json({
-        message: "User not verified",
+        message: "User not found",
       });
     }
+
+    user.isVerified = true;
+    await user.save();
 
     // prevent overwriting password
     if (user.password) {
