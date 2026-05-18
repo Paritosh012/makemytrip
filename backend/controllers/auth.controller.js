@@ -11,8 +11,6 @@ const { sendEmail } = require("../utils/email");
 // ================= REGISTER =================
 
 const register = async (req, res) => {
-  console.log("EMAIL_USER:", process.env.EMAIL_USER);
-  console.log("EMAIL_PASS:", process.env.EMAIL_PASS ? "SET" : "MISSING");
   try {
     const { name, email } = req.body;
 
@@ -208,9 +206,9 @@ const resendOtp = async (req, res) => {
       user.email,
       "Your OTP Code",
       `<h1>Verify Your Email</h1>
-        <p>Your OTP code is:</p>
-        <h2 style="color:blue;">${otp}</h2>
-        <p>This OTP expires in 5 minutes.</p>`,
+      <p>Your OTP code is:</p>
+      <h2 style="color:blue;">123456</h2>
+      <p>This OTP expires in 5 minutes.</p>`,
     );
 
     return res.status(200).json({
