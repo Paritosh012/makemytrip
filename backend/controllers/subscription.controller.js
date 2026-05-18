@@ -1,6 +1,6 @@
 const Subscription = require("../models/subscription.model");
 const Tenant = require("../models/tenant.model");
-const razorpay = require("../config/razorpay");
+const getRazorpay = require("../config/razorpay");
 
 const PLAN_IDS = {
   BASIC: "plan_SeHc38lJOsX9uV",
@@ -41,7 +41,7 @@ const createSubscription = async (req, res) => {
     }
 
     // 🔥 Create Razorpay subscription
-    const rzpSub = await razorpay.subscriptions.create({
+    const rzpSub = await getRazorpay().subscriptions.create({
       plan_id: PLAN_IDS[plan],
       customer_notify: 1,
       total_count: 12,

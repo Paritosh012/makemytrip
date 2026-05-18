@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const razorpay = require("../config/razorpay");
+const getRazorpay = require("../config/razorpay");
 const Booking = require("../models/booking.model");
 const Package = require("../models/package.model");
 
@@ -41,7 +41,7 @@ const createOrder = async (req, res) => {
       });
     }
 
-    const order = await razorpay.orders.create({
+    const order = await getRazorpay().orders.create({
       amount: booking.price * 100,
       currency: "INR",
       receipt: booking._id.toString(),

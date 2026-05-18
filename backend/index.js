@@ -10,7 +10,7 @@ const connectDB = require("./config/db");
 
 // ROUTES
 const authRoutes = require("./routes/auth.routes");
-const adminRoutes = require("./routes/admin.routes"); // ✅ renamed
+const adminRoutes = require("./routes/admin.routes"); 
 const hostApplicationRoutes = require("./routes/host.application.routes");
 const packageRoutes = require("./routes/package.routes");
 const subscriptionRoutes = require("./routes/subscription.routes");
