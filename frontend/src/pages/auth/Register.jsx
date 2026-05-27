@@ -17,7 +17,7 @@ const Register = () => {
     setLoading(true);
     try {
       await authService.register(form);
-      navigate("/set-password", { state: { email: form.email } });
+      navigate("/verify-otp", { state: { email: form.email } });
     } catch (err) {
       setError(err.message);
     } finally {
