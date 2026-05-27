@@ -20,6 +20,7 @@ const Register = () => {
       navigate("/verify-otp", { state: { email: form.email } });
     } catch (err) {
       setError(err.message);
+      console.error(err.message);
     } finally {
       setLoading(false);
     }
