@@ -16,6 +16,7 @@ const Register = () => {
     setError("");
     setLoading(true);
     try {
+      console.log("Sending OTP...");
       await authService.register(form);
       navigate("/verify-otp", { state: { email: form.email } });
     } catch (err) {
