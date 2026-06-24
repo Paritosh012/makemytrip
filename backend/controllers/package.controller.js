@@ -135,6 +135,8 @@ const getPackages = async (req, res) => {
     const filter = {
       tenantId,
       status: { $ne: "ARCHIVED" },
+      endDate: { $gte: new Date() },
+      seatsAvailable: { $gt: 0 },
     };
 
     const [packages, totalPackages] = await Promise.all([
@@ -342,6 +344,7 @@ const getPublicPackages = async (req, res) => {
     const packages = await Package.find({
       status: "ACTIVE",
       seatsAvailable: { $gt: 0 },
+      endDate: { $gte: new Date() },
     }).select("title destination price seatsAvailable startDate");
 
     return res.json({

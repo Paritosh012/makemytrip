@@ -5,7 +5,6 @@ const {
   createSubscription,
   verifySubscriptionPayment,
   getMySubscription,
-  getSubscriptionHistory,
   cancelSubscription,
 } = require("../controllers/subscription.controller");
 

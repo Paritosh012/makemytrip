@@ -15,7 +15,10 @@ const subscriptionMiddleware = async (req, res, next) => {
     }
 
     // ✅ Fetch subscription
-    const subscription = await Subscription.findOne({ tenantId });
+    const subscription = await Subscription.findOne({
+      tenantId,
+      status: "ACTIVE",
+    }).sort({ createdAt: -1 });
 
     if (!subscription) {
       return res.status(403).json({
@@ -27,7 +30,7 @@ const subscriptionMiddleware = async (req, res, next) => {
     const now = new Date();
 
     // ❌ Expiry check (NO DB mutation here)
-    if (subscription.endDate < now) {
+    if (!subscription.endDate || subscription.endDate < now) {
       return res.status(403).json({
         success: false,
         message: "Subscription expired. Please renew.",

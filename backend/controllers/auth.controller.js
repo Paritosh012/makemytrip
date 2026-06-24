@@ -209,7 +209,7 @@ const resendOtp = async (req, res) => {
       "Your OTP Code",
       `<h1>Verify Your Email</h1>
       <p>Your OTP code is:</p>
-      <h2 style="color:blue;">123456</h2>
+      <h2 style="color:blue;">${otp}</h2>
       <p>This OTP expires in 5 minutes.</p>`,
     );
 
