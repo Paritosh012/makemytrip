@@ -70,9 +70,7 @@ const Sidebar = () => {
     <aside className="sidebar">
       {/* LOGO */}
       <div className="sidebar-logo">
-        <div className="logo-text">
-          Travel<span>SaaS</span>
-        </div>
+        <div className="logo-text">YATRI</div>
       </div>
 
       {/* ROLE */}

@@ -42,8 +42,10 @@ const SiteHeader = () => {
     <header className="site-header">
       <div className="container bar">
         <Link to="/" className="site-logo" onClick={() => setOpen(false)}>
-          <span className="mark"><IconPlane /></span>
-          Travel SaaS
+          <span className="mark">
+            <IconPlane />
+          </span>
+          YATRI
         </Link>
 
         <nav className="site-nav">
@@ -56,28 +58,44 @@ const SiteHeader = () => {
         <div className="right">
           {!isAuthenticated && (
             <div className="desktop-only" style={{ display: "flex", gap: 10 }}>
-              <Link to="/login" className="ybtn ybtn-ghost">Sign in</Link>
-              <Link to="/register" className="ybtn ybtn-primary">Sign up</Link>
+              <Link to="/login" className="ybtn ybtn-ghost">
+                Sign in
+              </Link>
+              <Link to="/register" className="ybtn ybtn-primary">
+                Sign up
+              </Link>
             </div>
           )}
 
           {isAuthenticated && user?.role === "END_USER" && (
-            <div className="desktop-only" style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <Link to="/bookings" className="ybtn ybtn-ghost">My trips</Link>
+            <div
+              className="desktop-only"
+              style={{ display: "flex", gap: 10, alignItems: "center" }}
+            >
+              <Link to="/bookings" className="ybtn ybtn-ghost">
+                My trips
+              </Link>
               <span className="user-chip">
                 <span className="av">{initial}</span>
                 <span className="nm">{user?.name || "Traveler"}</span>
               </span>
-              <button className="ybtn ybtn-link" onClick={handleLogout}>Sign out</button>
+              <button className="ybtn ybtn-link" onClick={handleLogout}>
+                Sign out
+              </button>
             </div>
           )}
 
           {isAuthenticated && dashHref && (
-            <div className="desktop-only" style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <div
+              className="desktop-only"
+              style={{ display: "flex", gap: 10, alignItems: "center" }}
+            >
               <Link to={dashHref} className="ybtn ybtn-primary">
                 {user.role === "HOST" ? "Host dashboard" : "Admin panel"}
               </Link>
-              <button className="ybtn ybtn-link" onClick={handleLogout}>Sign out</button>
+              <button className="ybtn ybtn-link" onClick={handleLogout}>
+                Sign out
+              </button>
             </div>
           )}
 
@@ -94,22 +112,36 @@ const SiteHeader = () => {
       {/* Mobile menu */}
       <div className="container">
         <div className={`mobile-menu ${open ? "open" : ""}`}>
-          <a href="/#packages" onClick={() => setOpen(false)}>Packages</a>
-          <a href="/#destinations" onClick={() => setOpen(false)}>Destinations</a>
-          <a href="/#how" onClick={() => setOpen(false)}>How it works</a>
-          <a href="/#reviews" onClick={() => setOpen(false)}>Reviews</a>
+          <a href="/#packages" onClick={() => setOpen(false)}>
+            Packages
+          </a>
+          <a href="/#destinations" onClick={() => setOpen(false)}>
+            Destinations
+          </a>
+          <a href="/#how" onClick={() => setOpen(false)}>
+            How it works
+          </a>
+          <a href="/#reviews" onClick={() => setOpen(false)}>
+            Reviews
+          </a>
           <div className="divider" />
 
           {!isAuthenticated && (
             <>
-              <Link to="/login" onClick={() => setOpen(false)}>Sign in</Link>
-              <Link to="/register" onClick={() => setOpen(false)}>Sign up</Link>
+              <Link to="/login" onClick={() => setOpen(false)}>
+                Sign in
+              </Link>
+              <Link to="/register" onClick={() => setOpen(false)}>
+                Sign up
+              </Link>
             </>
           )}
 
           {isAuthenticated && user?.role === "END_USER" && (
             <>
-              <Link to="/bookings" onClick={() => setOpen(false)}>My trips</Link>
+              <Link to="/bookings" onClick={() => setOpen(false)}>
+                My trips
+              </Link>
               <button onClick={handleLogout}>Sign out</button>
             </>
           )}

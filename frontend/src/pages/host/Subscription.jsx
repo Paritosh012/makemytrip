@@ -64,7 +64,7 @@ const Subscription = () => {
     const options = {
       key,
       subscription_id: subscriptionId,
-      name: "Travel SaaS",
+      name: "Yatri",
       description: `${plan} Plan Subscription`,
 
       handler: async (response) => {
