@@ -64,13 +64,15 @@ const Subscription = () => {
     const options = {
       key,
       subscription_id: subscriptionId,
-      name: "Your Tech Buddy",
+      name: "Travel SaaS",
       description: `${plan} Plan Subscription`,
 
       handler: async (response) => {
         try {
+          console.log("RAZORPAY RESPONSE:", response);
+
           await subscriptionService.verifySubscriptionPayment({
-            razorpay_subscription_id: subscriptionId, // 🔥 THIS IS KEY
+            razorpay_subscription_id: response.razorpay_subscription_id,
           });
 
           setMessage("Subscription activated!");
@@ -93,7 +95,7 @@ const Subscription = () => {
 
     const rzp = new window.Razorpay(options);
     rzp.open();
-  };
+  }; 
 
   const handleSubscribe = async (planId) => {
     if (loading) return;

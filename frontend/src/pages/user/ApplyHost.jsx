@@ -51,21 +51,11 @@ const ApplyHost = () => {
 
       <div style={{ maxWidth: 560 }}>
         <div className="card" style={{ marginBottom: 20 }}>
-          <div style={{ display: "flex", gap: 16 }}>
+          <div className="host-benefits">
             {["Create packages", "Manage bookings", "Grow your business"].map(
               (item) => (
-                <div
-                  key={item}
-                  style={{
-                    flex: 1,
-                    padding: "12px 16px",
-                    background: "var(--surface2)",
-                    borderRadius: 10,
-                    fontSize: 13,
-                  }}
-                >
-                  <span style={{ color: "var(--accent)" }}>✓ </span>
-                  {item}
+                <div key={item} className="host-benefit">
+                  ✓ {item}
                 </div>
               ),
             )}

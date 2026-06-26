@@ -1,6 +1,7 @@
 const Subscription = require("../models/subscription.model");
 const Tenant = require("../models/tenant.model");
 const getRazorpay = require("../config/razorpay");
+const PLANS = require("../config/plan.config");
 
 const PLAN_IDS = {
   BASIC: "plan_SeHc38lJOsX9uV",
@@ -13,29 +14,26 @@ const PLAN_IDS = {
 // =============================
 const createSubscription = async (req, res) => {
   try {
-    const razorpay = getRazorpay();
-
-    const plan =
-      typeof req.body.plan === "string"
-        ? req.body.plan.trim().toUpperCase()
-        : null;
-
-    const tenantId = req.user?.tenantId;
+    const { plan } = req.body;
+    const tenantId = req.user.tenantId;
 
     if (!tenantId) {
-      return res.status(400).json({
-        success: false,
-        message: "Tenant not found",
-      });
+      return res.status(400).json({ success: false, message: "No tenant" });
     }
 
     if (!plan || !PLAN_IDS[plan]) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid plan",
-      });
+      return res.status(400).json({ success: false, message: "Invalid plan" });
     }
 
+    // ✅ Fetch plan config to apply limits
+    const planConfig = PLANS[plan];
+    if (!planConfig) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Plan config not found" });
+    }
+
+    // ❗ Only block ACTIVE or PENDING
     const existing = await Subscription.findOne({
       tenantId,
       status: { $in: ["ACTIVE", "PENDING"] },
@@ -46,32 +44,37 @@ const createSubscription = async (req, res) => {
         success: false,
         message:
           existing.status === "PENDING"
-            ? "Complete pending payment first"
+            ? "Complete pending payment"
             : "Active subscription already exists",
       });
     }
 
-    const rzpSub = await razorpay.subscriptions.create({
+    // 🔥 Create Razorpay subscription
+    const rzpSub = await getRazorpay().subscriptions.create({
       plan_id: PLAN_IDS[plan],
       customer_notify: 1,
       total_count: 12,
     });
 
+    // ✅ Save in DB with plan limits applied
     const dbSub = await Subscription.create({
       tenantId,
       plan,
       razorpaySubscriptionId: rzpSub.id,
       status: "PENDING",
+      maxAgents: planConfig.maxAgents, // ✅ FROM PLAN CONFIG
+      maxBookingsPerMonth: planConfig.maxBookingsPerMonth, // ✅ FROM PLAN CONFIG
     });
 
-    return res.status(201).json({
+    return res.json({
       success: true,
-      subscriptionId: rzpSub.id,
-      data: dbSub,
+      data: {
+        subscriptionId: rzpSub.id,
+        ...dbSub.toObject(),
+      },
     });
   } catch (err) {
     console.error("CREATE SUB ERROR:", err);
-
     return res.status(500).json({
       success: false,
       message: err.message,
@@ -80,29 +83,21 @@ const createSubscription = async (req, res) => {
 };
 
 // =============================
-// VERIFY SUBSCRIPTION
+// VERIFY PAYMENT
 // =============================
 const verifySubscriptionPayment = async (req, res) => {
   try {
-    const razorpay = getRazorpay();
-
     const { razorpay_subscription_id } = req.body;
-    const tenantId = req.user?.tenantId;
+    const tenantId = req.user.tenantId;
 
     if (!tenantId) {
       return res.status(400).json({
         success: false,
-        message: "Tenant not found",
+        message: "No tenant",
       });
     }
 
-    if (!razorpay_subscription_id) {
-      return res.status(400).json({
-        success: false,
-        message: "Subscription id required",
-      });
-    }
-
+    // 🔥 Find SAME subscription
     const sub = await Subscription.findOne({
       tenantId,
       razorpaySubscriptionId: razorpay_subscription_id,
@@ -110,14 +105,15 @@ const verifySubscriptionPayment = async (req, res) => {
     });
 
     if (!sub) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
-        message: "Subscription not found",
+        message: "Subscription not found or already processed",
       });
     }
 
-    const rzpSub = await razorpay.subscriptions.fetch(
-      razorpay_subscription_id
+    // 🔥 Fetch from Razorpay
+    const rzpSub = await getRazorpay().subscriptions.fetch(
+      razorpay_subscription_id,
     );
 
     if (!rzpSub) {
@@ -130,32 +126,22 @@ const verifySubscriptionPayment = async (req, res) => {
     if (rzpSub.status !== "active") {
       return res.status(400).json({
         success: false,
-        message: `Subscription status is ${rzpSub.status}`,
+        message: "Payment not completed",
       });
     }
 
+    // ✅ UPDATE SAME RECORD (NO NEW CREATE)
     sub.status = "ACTIVE";
-
-    if (rzpSub.start_at) {
-      sub.startDate = new Date(rzpSub.start_at * 1000);
-    }
-
-    if (rzpSub.current_end) {
-      sub.endDate = new Date(rzpSub.current_end * 1000);
-    }
+    sub.startDate = new Date(rzpSub.start_at * 1000);
+    sub.endDate = new Date(rzpSub.current_end * 1000);
 
     await sub.save();
 
-    await Tenant.findByIdAndUpdate(
-      tenantId,
-      {
-        status: "ACTIVE",
-        subscriptionId: sub._id,
-      },
-      {
-        returnDocument: "after",
-      }
-    );
+    // ✅ Activate tenant
+    await Tenant.findByIdAndUpdate(tenantId, {
+      status: "ACTIVE",
+      subscriptionId: sub._id,
+    });
 
     return res.json({
       success: true,
@@ -164,7 +150,6 @@ const verifySubscriptionPayment = async (req, res) => {
     });
   } catch (err) {
     console.error("VERIFY ERROR:", err);
-
     return res.status(500).json({
       success: false,
       message: err.message,
@@ -173,18 +158,11 @@ const verifySubscriptionPayment = async (req, res) => {
 };
 
 // =============================
-// GET CURRENT SUBSCRIPTION
+// GET CURRENT SUB
 // =============================
 const getMySubscription = async (req, res) => {
   try {
-    const tenantId = req.user?.tenantId;
-
-    if (!tenantId) {
-      return res.status(400).json({
-        success: false,
-        message: "Tenant not found",
-      });
-    }
+    const tenantId = req.user.tenantId;
 
     const subscription = await Subscription.findOne({
       tenantId,
@@ -193,11 +171,10 @@ const getMySubscription = async (req, res) => {
 
     return res.json({
       success: true,
-      data: subscription,
+      data: subscription || null,
     });
   } catch (err) {
     console.error(err);
-
     return res.status(500).json({
       success: false,
       message: "Failed to fetch subscription",
@@ -206,63 +183,89 @@ const getMySubscription = async (req, res) => {
 };
 
 // =============================
-// CANCEL SUBSCRIPTION
+// CANCEL
 // =============================
 const cancelSubscription = async (req, res) => {
   try {
-    const razorpay = getRazorpay();
-
-    const tenantId = req.user?.tenantId;
-
-    if (!tenantId) {
-      return res.status(400).json({
-        success: false,
-        message: "Tenant not found",
-      });
-    }
+    const tenantId = req.user.tenantId;
 
     const sub = await Subscription.findOne({
       tenantId,
       status: "ACTIVE",
-    }).sort({ createdAt: -1 });
+    });
 
     if (!sub) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
-        message: "No active subscription found",
+        message: "No active subscription",
       });
     }
 
-    await razorpay.subscriptions.cancel(
-      sub.razorpaySubscriptionId
-    );
+    await getRazorpay().subscriptions.cancel(sub.razorpaySubscriptionId);
 
     sub.status = "CANCELLED";
     sub.cancelledAt = new Date();
 
     await sub.save();
 
-    await Tenant.findByIdAndUpdate(
-      tenantId,
-      {
-        status: "PENDING",
-        subscriptionId: null,
+    return res.json({
+      success: true,
+      message: "Cancelled successfully",
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      success: false,
+      message: "Cancel failed",
+    });
+  }
+};
+
+// =============================
+// GET PLAN DETAILS (NEW)
+// =============================
+const getPlanDetails = async (req, res) => {
+  try {
+    // Plan pricing (add this to config/plan.config.js in the future)
+    const PLAN_PRICING = {
+      BASIC: {
+        name: "Basic",
+        price: 4999,
+        currency: "INR",
+        interval: "month",
+        razorpayPlanId: PLAN_IDS.BASIC,
       },
-      {
-        returnDocument: "after",
-      }
-    );
+      PRO: {
+        name: "Professional",
+        price: 14999,
+        currency: "INR",
+        interval: "month",
+        razorpayPlanId: PLAN_IDS.PRO,
+      },
+      PREMIUM: {
+        name: "Premium",
+        price: 49999,
+        currency: "INR",
+        interval: "month",
+        razorpayPlanId: PLAN_IDS.PREMIUM,
+      },
+    };
+
+    const plans = Object.entries(PLANS).map(([key, config]) => ({
+      plan: key,
+      ...config,
+      ...PLAN_PRICING[key],
+    }));
 
     return res.json({
       success: true,
-      message: "Subscription cancelled successfully",
+      plans,
     });
   } catch (err) {
-    console.error("CANCEL ERROR:", err);
-
+    console.error("PLAN DETAILS ERROR:", err);
     return res.status(500).json({
       success: false,
-      message: err.message,
+      message: "Failed to fetch plans",
     });
   }
 };
@@ -272,4 +275,5 @@ module.exports = {
   verifySubscriptionPayment,
   getMySubscription,
   cancelSubscription,
+  getPlanDetails,
 };

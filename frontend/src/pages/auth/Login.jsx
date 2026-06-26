@@ -27,7 +27,7 @@ const Login = () => {
       if (!user) throw new Error('Failed to load user')
       if (user.role === 'SUPER_ADMIN') navigate('/admin/dashboard')
       else if (user.role === 'HOST') navigate('/host/dashboard')
-      else navigate('/home')
+      else navigate('/')
     } catch (err) {
       setError(err.message)
     } finally {

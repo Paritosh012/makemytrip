@@ -10,9 +10,8 @@ NAV CONFIG (role + optional permission)
 */
 const navConfig = {
   END_USER: [
-    { to: "/home", label: "✦ Browse Packages" },
+    { to: "/", label: "✦ Browse Packages" },
     { to: "/bookings", label: "⊞ My Bookings" },
-    { to: "/apply-host", label: "⊕ Become a Host" },
   ],
 
   HOST: [
