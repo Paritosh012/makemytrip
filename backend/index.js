@@ -10,7 +10,7 @@ const connectDB = require("./config/db");
 
 // ROUTES
 const authRoutes = require("./routes/auth.routes");
-const adminRoutes = require("./routes/admin.routes"); 
+const adminRoutes = require("./routes/admin.routes");
 const hostApplicationRoutes = require("./routes/host.application.routes");
 const packageRoutes = require("./routes/package.routes");
 const subscriptionRoutes = require("./routes/subscription.routes");
@@ -28,17 +28,19 @@ SECURITY + MIDDLEWARE
 */
 
 const allowedOrigins = [
-  "http://localhost:5173",
-  "https://makemytrip-frontend-kvdy.onrender.com",
-];
+  "http://localhost:5173", // ✅ dev
+  "http://localhost:3000", // ✅ dev alt
+  "https://makemytrip-frontend-kvdy.onrender.com", // ✅ production
+  process.env.FRONTEND_URL, // ✅ production (from Render env)
+].filter(Boolean);
 
 app.use(
   cors({
     origin: function (origin, callback) {
       if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
+        callback(null, true); // ✅ allow
       } else {
-        callback(new Error("Not allowed by CORS"));
+        callback(new Error("Not allowed by CORS")); // ❌ block
       }
     },
     credentials: true,
