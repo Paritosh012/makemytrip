@@ -58,6 +58,7 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
 });
+app.set("trust proxy", 1);
 
 app.use(helmet());
 app.use(cookieParser());
