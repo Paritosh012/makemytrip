@@ -80,7 +80,7 @@ const createBooking = async (req, res) => {
           seats,
         },
       ],
-      { session }
+      { session },
     );
 
     await session.commitTransaction();
@@ -111,7 +111,9 @@ const cancelBooking = async (req, res) => {
     const booking = await bookingModel.findById(bookingId);
 
     if (!booking) {
-      return res.status(404).json({ success: false, message: "Booking not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Booking not found" });
     }
 
     // ✅ Ownership check
@@ -120,21 +122,29 @@ const cancelBooking = async (req, res) => {
     }
 
     if (booking.status === "CANCELLED") {
-      return res.status(400).json({ success: false, message: "Booking already cancelled" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Booking already cancelled" });
     }
 
     if (!["PENDING", "CONFIRMED"].includes(booking.status)) {
-      return res.status(400).json({ success: false, message: "Invalid booking state" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid booking state" });
     }
 
     const pkg = await packageModel.findById(booking.packageId);
 
     if (!pkg) {
-      return res.status(404).json({ success: false, message: "Package not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Package not found" });
     }
 
     if (pkg.startDate && new Date() > new Date(pkg.startDate)) {
-      return res.status(400).json({ success: false, message: "Cannot cancel after trip starts" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Cannot cancel after trip starts" });
     }
 
     // ✅ Payment status update
@@ -166,7 +176,9 @@ const cancelBooking = async (req, res) => {
     });
   } catch (error) {
     console.error("CANCEL ERROR:", error);
-    return res.status(500).json({ success: false, message: "Cancel booking failed" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Cancel booking failed" });
   }
 };
 
@@ -192,4 +204,65 @@ const getBookings = async (req, res) => {
   }
 };
 
-module.exports = { createBooking, cancelBooking, getBookings };
+const getBookingsByHost = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const userRole = req.user.role;
+
+    console.log(`📋 Fetching bookings for HOST ${userId}`);
+
+    // ✅ Only HOST can access their own bookings
+    if (userRole !== "HOST") {
+      return res.status(403).json({
+        success: false,
+        message: "Only HOST can access their bookings",
+      });
+    }
+
+    // ✅ Get all packages owned by this HOST
+    const hostPackages = await Package.find({ hostId: userId }).select("_id");
+    const packageIds = hostPackages.map((p) => p._id);
+
+    if (packageIds.length === 0) {
+      return res.json({ success: true, bookings: [] });
+    }
+
+    // ✅ Get all bookings for these packages
+    const bookings = await Booking.find({ packageId: { $in: packageIds } })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    console.log(`✅ Found ${bookings.length} bookings for HOST`);
+
+    return res.json({
+      success: true,
+      bookings: bookings.map((b) => ({
+        _id: b._id,
+        packageTitle: b.packageTitle,
+        destination: b.packageDestination,
+        customerName: b.customerName,
+        customerEmail: b.customerEmail,
+        startDate: b.startDate,
+        endDate: b.endDate,
+        seats: b.seats,
+        price: b.price,
+        status: b.status,
+        paymentStatus: b.paymentStatus,
+        createdAt: b.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error("❌ GET HOST BOOKINGS ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch host bookings",
+    });
+  }
+};
+
+module.exports = {
+  createBooking,
+  cancelBooking,
+  getBookings,
+  getBookingsByHost,
+};

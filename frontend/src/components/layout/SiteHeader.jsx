@@ -11,14 +11,6 @@ const SiteHeader = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
-  // 🔥 DEBUG: Log auth state
-  console.log("🔍 SiteHeader Auth Debug:", {
-    user,
-    isAuthenticated,
-    loading,
-    userRole: user?.role,
-  });
-
   const handleLogout = async () => {
     setOpen(false);
     try {
@@ -29,25 +21,24 @@ const SiteHeader = () => {
     }
   };
 
-  const dashHref =
-    user?.role === "SUPER_ADMIN"
-      ? "/admin/dashboard"
-      : user?.role === "HOST"
-        ? "/host/dashboard"
-        : null;
+  // ✅ Dashboard link for SUPER_ADMIN
+  const dashHref = user?.role === "SUPER_ADMIN" ? "/admin/dashboard" : null;
 
+  // ✅ Get first letter for avatar
   const initial = (user?.name || user?.email || "U").charAt(0).toUpperCase();
 
   return (
     <header className="site-header">
-      <div className="container bar">
+      <div className="container header-bar">
+        {/* LOGO */}
         <Link to="/" className="site-logo" onClick={() => setOpen(false)}>
-          <span className="mark">
+          <span className="logo-icon">
             <IconPlane />
           </span>
-          YATRI
+          <span className="logo-text">YATRI</span>
         </Link>
 
+        {/* NAV (Desktop) */}
         <nav className="site-nav">
           <a href="/#packages">Packages</a>
           <a href="/#destinations">Destinations</a>
@@ -55,107 +46,181 @@ const SiteHeader = () => {
           <a href="/#reviews">Reviews</a>
         </nav>
 
-        <div className="right">
-          {!isAuthenticated && (
-            <div className="desktop-only" style={{ display: "flex", gap: 10 }}>
-              <Link to="/login" className="ybtn ybtn-ghost">
+        {/* RIGHT SECTION */}
+        <div className="header-right">
+          {/* NOT AUTHENTICATED */}
+          {!isAuthenticated && !loading && (
+            <div className="auth-group">
+              <Link to="/login" className="btn btn-ghost">
                 Sign in
               </Link>
-              <Link to="/register" className="ybtn ybtn-primary">
+              <Link to="/register" className="btn btn-primary">
                 Sign up
               </Link>
             </div>
           )}
 
+          {/* END_USER AUTHENTICATED */}
           {isAuthenticated && user?.role === "END_USER" && (
-            <div
-              className="desktop-only"
-              style={{ display: "flex", gap: 10, alignItems: "center" }}
-            >
-              <Link to="/bookings" className="ybtn ybtn-ghost">
+            <div className="auth-group">
+              <Link to="/bookings" className="btn btn-ghost">
                 My trips
               </Link>
-              <span className="user-chip">
-                <span className="av">{initial}</span>
-                <span className="nm">{user?.name || "Traveler"}</span>
-              </span>
-              <button className="ybtn ybtn-link" onClick={handleLogout}>
+              <div className="user-avatar">
+                <span className="avatar-circle">{initial}</span>
+                <span className="user-name">{user?.name || "Traveler"}</span>
+              </div>
+              <button className="btn btn-ghost btn-sm" onClick={handleLogout}>
                 Sign out
               </button>
             </div>
           )}
 
-          {isAuthenticated && dashHref && (
-            <div
-              className="desktop-only"
-              style={{ display: "flex", gap: 10, alignItems: "center" }}
-            >
-              <Link to={dashHref} className="ybtn ybtn-primary">
-                {user.role === "HOST" ? "Host dashboard" : "Admin panel"}
+          {/* HOST AUTHENTICATED */}
+          {isAuthenticated && user?.role === "HOST" && (
+            <div className="auth-group">
+              <Link to="/host/dashboard" className="btn btn-primary btn-sm">
+                Host Dashboard
               </Link>
-              <button className="ybtn ybtn-link" onClick={handleLogout}>
+              <Link to="/host/bookings" className="btn btn-ghost btn-sm">
+                View Bookings
+              </Link>
+              <button className="btn btn-ghost btn-sm" onClick={handleLogout}>
                 Sign out
               </button>
             </div>
           )}
 
+          {/* ADMIN/SUPER_ADMIN AUTHENTICATED */}
+          {isAuthenticated &&
+            (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") && (
+              <div className="auth-group">
+                <Link
+                  to={dashHref || "/admin/users"}
+                  className="btn btn-primary btn-sm"
+                >
+                  {user?.role === "SUPER_ADMIN"
+                    ? "Admin Dashboard"
+                    : "Admin Panel"}
+                </Link>
+                <button className="btn btn-ghost btn-sm" onClick={handleLogout}>
+                  Sign out
+                </button>
+              </div>
+            )}
+
+          {/* HAMBURGER (Mobile) */}
           <button
             className="hamburger"
-            aria-label="Menu"
-            onClick={() => setOpen((o) => !o)}
+            aria-label="Toggle menu"
+            onClick={() => setOpen(!open)}
           >
             {open ? <IconClose /> : <IconMenu />}
           </button>
         </div>
       </div>
 
-      {/* Mobile menu */}
-      <div className="container">
-        <div className={`mobile-menu ${open ? "open" : ""}`}>
-          <a href="/#packages" onClick={() => setOpen(false)}>
-            Packages
-          </a>
-          <a href="/#destinations" onClick={() => setOpen(false)}>
-            Destinations
-          </a>
-          <a href="/#how" onClick={() => setOpen(false)}>
-            How it works
-          </a>
-          <a href="/#reviews" onClick={() => setOpen(false)}>
-            Reviews
-          </a>
-          <div className="divider" />
+      {/* MOBILE MENU */}
+      {open && (
+        <div className="mobile-menu-wrapper">
+          <div className="container">
+            <nav className="mobile-menu">
+              <a href="/#packages" onClick={() => setOpen(false)}>
+                Packages
+              </a>
+              <a href="/#destinations" onClick={() => setOpen(false)}>
+                Destinations
+              </a>
+              <a href="/#how" onClick={() => setOpen(false)}>
+                How it works
+              </a>
+              <a href="/#reviews" onClick={() => setOpen(false)}>
+                Reviews
+              </a>
 
-          {!isAuthenticated && (
-            <>
-              <Link to="/login" onClick={() => setOpen(false)}>
-                Sign in
-              </Link>
-              <Link to="/register" onClick={() => setOpen(false)}>
-                Sign up
-              </Link>
-            </>
-          )}
+              <div className="menu-divider" />
 
-          {isAuthenticated && user?.role === "END_USER" && (
-            <>
-              <Link to="/bookings" onClick={() => setOpen(false)}>
-                My trips
-              </Link>
-              <button onClick={handleLogout}>Sign out</button>
-            </>
-          )}
+              {/* NOT AUTHENTICATED (Mobile) */}
+              {!isAuthenticated && !loading && (
+                <div className="mobile-auth">
+                  <Link
+                    to="/login"
+                    className="btn btn-ghost"
+                    onClick={() => setOpen(false)}
+                  >
+                    Sign in
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="btn btn-primary"
+                    onClick={() => setOpen(false)}
+                  >
+                    Sign up
+                  </Link>
+                </div>
+              )}
 
-          {isAuthenticated && dashHref && (
-            <>
-              <Link to={dashHref} onClick={() => setOpen(false)}>
-                {user.role === "HOST" ? "Host dashboard" : "Admin panel"}
-              </Link>
-              <button onClick={handleLogout}>Sign out</button>
-            </>
-          )}
+              {/* END_USER (Mobile) */}
+              {isAuthenticated && user?.role === "END_USER" && (
+                <div className="mobile-auth">
+                  <Link
+                    to="/bookings"
+                    className="btn btn-ghost"
+                    onClick={() => setOpen(false)}
+                  >
+                    My trips
+                  </Link>
+                  <button className="btn btn-ghost" onClick={handleLogout}>
+                    Sign out
+                  </button>
+                </div>
+              )}
+
+              {/* HOST (Mobile) */}
+              {isAuthenticated && user?.role === "HOST" && (
+                <div className="mobile-auth">
+                  <Link
+                    to="/host/dashboard"
+                    className="btn btn-primary"
+                    onClick={() => setOpen(false)}
+                  >
+                    Host Dashboard
+                  </Link>
+                  <Link
+                    to="/host/bookings"
+                    className="btn btn-ghost"
+                    onClick={() => setOpen(false)}
+                  >
+                    View Bookings
+                  </Link>
+                  <button className="btn btn-ghost" onClick={handleLogout}>
+                    Sign out
+                  </button>
+                </div>
+              )}
+
+              {/* ADMIN/SUPER_ADMIN (Mobile) */}
+              {isAuthenticated &&
+                (user?.role === "ADMIN" || user?.role === "SUPER_ADMIN") && (
+                  <div className="mobile-auth">
+                    <Link
+                      to={dashHref || "/admin/users"}
+                      className="btn btn-primary"
+                      onClick={() => setOpen(false)}
+                    >
+                      {user?.role === "SUPER_ADMIN"
+                        ? "Admin Dashboard"
+                        : "Admin Panel"}
+                    </Link>
+                    <button className="btn btn-ghost" onClick={handleLogout}>
+                      Sign out
+                    </button>
+                  </div>
+                )}
+            </nav>
+          </div>
         </div>
-      </div>
+      )}
     </header>
   );
 };

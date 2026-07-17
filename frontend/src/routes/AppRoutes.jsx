@@ -27,6 +27,7 @@ import AdminDashboard from "../pages/admin/Dashboard";
 import Applications from "../pages/admin/Applications";
 import Tenants from "../pages/admin/Tenants";
 import Users from "../pages/admin/Users";
+import HostBookings from "../pages/host/Hostbookings";
 
 // Wrap a customer inner page in the light "site-page" shell.
 const SitePage = ({ children }) => (
@@ -39,7 +40,8 @@ const AppRoutes = () => {
   const { user, isAuthenticated } = useAuth();
 
   const homeForRole = () => {
-    if (isAuthenticated && user?.role === "SUPER_ADMIN") return "/admin/dashboard";
+    if (isAuthenticated && user?.role === "SUPER_ADMIN")
+      return "/admin/dashboard";
     if (isAuthenticated && user?.role === "HOST") return "/host/dashboard";
     return "/";
   };
@@ -62,7 +64,9 @@ const AppRoutes = () => {
           path="/bookings"
           element={
             <ProtectedRoute allowedRoles={["END_USER"]}>
-              <SitePage><BookingHistory /></SitePage>
+              <SitePage>
+                <BookingHistory />
+              </SitePage>
             </ProtectedRoute>
           }
         />
@@ -70,7 +74,9 @@ const AppRoutes = () => {
           path="/apply-host"
           element={
             <ProtectedRoute allowedRoles={["END_USER"]}>
-              <SitePage><ApplyHost /></SitePage>
+              <SitePage>
+                <ApplyHost />
+              </SitePage>
             </ProtectedRoute>
           }
         />
@@ -91,7 +97,11 @@ const AppRoutes = () => {
         <Route path="/host/packages" element={<ManagePackages />} />
         <Route path="/host/create-package" element={<CreatePackage />} />
         <Route path="/host/subscription" element={<Subscription />} />
-        <Route path="/host/manage-subscription" element={<ManageSubscription />} />
+        <Route
+          path="/host/manage-subscription"
+          element={<ManageSubscription />}
+        />
+        <Route path="/host/bookings" element={<HostBookings />} />
       </Route>
 
       {/* ---------- SUPER_ADMIN (dark dashboard) ---------- */}

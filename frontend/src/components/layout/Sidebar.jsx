@@ -10,32 +10,33 @@ NAV CONFIG (role + optional permission)
 */
 const navConfig = {
   END_USER: [
-    { to: "/", label: "✦ Browse Packages" },
-    { to: "/bookings", label: "⊞ My Bookings" },
+    { to: "/", label: "Browse Packages" },
+    { to: "/bookings", label: "My Bookings" },
   ],
 
   HOST: [
-    { to: "/host/dashboard", label: "⊡ Dashboard" },
-    { to: "/host/packages", label: "⊞ Packages" },
-    { to: "/host/create-package", label: "⊕ New Package" },
-    { to: "/host/subscription", label: "◈ Subscription" },
+    { to: "/host/dashboard", label: "Dashboard" },
+    { to: "/host/packages", label: "Packages" },
+    { to: "/host/bookings", label: "View Bookings" },
+    { to: "/host/create-package", label: "New Package" },
+    { to: "/host/subscription", label: "Subscription" },
   ],
 
   ADMIN: [
-    { to: "/admin/users", label: "⊞ Users", permission: "VIEW_USERS" },
-    { to: "/admin/tenants", label: "◈ Tenants", permission: "VIEW_TENANTS" },
+    { to: "/admin/users", label: "Users", permission: "VIEW_USERS" },
+    { to: "/admin/tenants", label: "Tenants", permission: "VIEW_TENANTS" },
     {
       to: "/admin/applications",
-      label: "⊕ Applications",
+      label: "Applications",
       permission: "APPROVE_HOSTS",
     },
   ],
 
   SUPER_ADMIN: [
-    { to: "/admin/users", label: "⊞ Users" },
-    { to: "/admin/dashboard", label: "⊡ Dashboard" },
-    { to: "/admin/applications", label: "⊞ Applications" },
-    { to: "/admin/tenants", label: "◈ Tenants" },
+    { to: "/admin/users", label: "Users" },
+    { to: "/admin/dashboard", label: "Dashboard" },
+    { to: "/admin/applications", label: "Applications" },
+    { to: "/admin/tenants", label: "Tenants" },
   ],
 };
 
@@ -67,70 +68,55 @@ const Sidebar = () => {
   };
 
   return (
-    <aside className="sidebar">
-      {/* LOGO */}
-      <div className="sidebar-logo">
-        <div className="logo-text">YATRI</div>
+    <aside className="sidebar-light">
+      {/* LOGO SECTION */}
+      <div className="sidebar-header">
+        <div className="sidebar-logo">
+          <div className="logo-icon">✦</div>
+          <div className="logo-text">YATRI</div>
+        </div>
       </div>
 
-      {/* ROLE */}
-      <div className="sidebar-role">{user.role.replace("_", " ")}</div>
+      {/* ROLE BADGE */}
+      <div className="sidebar-role-badge">
+        {user.role.replace(/_/g, " ")}
+      </div>
 
-      {/* NAV */}
-      <nav>
+      {/* NAV SECTION */}
+      <nav className="sidebar-nav">
         {links.length === 0 ? (
-          <p style={{ padding: "12px", color: "gray" }}>No access available</p>
+          <div className="nav-empty">No access available</div>
         ) : (
-          links.map((link) => (
-            <NavLink
-              key={link.to}
-              to={link.to}
-              className={({ isActive }) =>
-                `nav-link${isActive ? " active" : ""}`
-              }
-            >
-              {link.label}
-            </NavLink>
-          ))
+          <div className="nav-links">
+            {links.map((link) => (
+              <NavLink
+                key={link.to}
+                to={link.to}
+                className={({ isActive }) =>
+                  `nav-link${isActive ? " active" : ""}`
+                }
+              >
+                <span>{link.label}</span>
+              </NavLink>
+            ))}
+          </div>
         )}
       </nav>
 
-      {/* USER INFO */}
-      <div style={{ marginTop: "auto", padding: "24px 24px 0" }}>
-        <div
-          style={{
-            borderTop: "1px solid var(--border)",
-            paddingTop: 16,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 13,
-              color: "var(--muted)",
-              marginBottom: 4,
-            }}
-          >
-            {user.name}
-          </div>
-
-          <div
-            style={{
-              fontSize: 12,
-              color: "var(--muted)",
-              marginBottom: 12,
-            }}
-          >
-            {user.email}
-          </div>
-
-          <button
-            className="btn btn-ghost"
-            style={{ padding: "6px 0", fontSize: 13 }}
-            onClick={handleLogout}
-          >
-            → Sign out
-          </button>
+      {/* USER SECTION */}
+      <div className="sidebar-footer">
+        <div className="user-info">
+          <div className="user-name">{user.name}</div>
+          <div className="user-email">{user.email}</div>
         </div>
+
+        <button
+          className="btn-logout"
+          onClick={handleLogout}
+          title="Sign out"
+        >
+          ← Sign out
+        </button>
       </div>
     </aside>
   );
