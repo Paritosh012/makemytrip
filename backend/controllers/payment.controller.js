@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const crypto = require("crypto");
 const getRazorpay = require("../config/razorpay");
 const Booking = require("../models/booking.model");
@@ -187,42 +188,58 @@ const verifyPayment = async (req, res) => {
 
     console.log(`✅ Signature verified for payment: ${razorpay_payment_id}`);
 
-    // ✅ Check seats still available before confirming
-    const pkg = await Package.findById(booking.packageId);
+    // ✅ ATOMIC seat decrement — prevents race condition
+    // Uses findOneAndUpdate with $inc so two concurrent payments
+    // can never both succeed when only 1 seat remains.
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    if (!pkg) {
-      console.error(`❌ Package not found: ${booking.packageId}`);
-      return res
-        .status(404)
-        .json({ success: false, message: "Package not found" });
-    }
-
-    if (pkg.seatsAvailable < booking.seats) {
-      console.error(
-        `❌ Not enough seats. Available: ${pkg.seatsAvailable}, Requested: ${booking.seats}`,
+    try {
+      const pkg = await Package.findOneAndUpdate(
+        {
+          _id: booking.packageId,
+          seatsAvailable: { $gte: booking.seats },
+        },
+        {
+          $inc: { seatsAvailable: -booking.seats },
+        },
+        { new: true, session },
       );
-      booking.paymentStatus = "FAILED";
-      await booking.save();
-      return res
-        .status(400)
-        .json({ success: false, message: "Seats no longer available" });
+
+      if (!pkg) {
+        await session.abortTransaction();
+        session.endSession();
+
+        console.error(
+          `❌ Atomic seat decrement failed — not enough seats for booking ${booking._id}`,
+        );
+        booking.paymentStatus = "FAILED";
+        await booking.save();
+        return res
+          .status(400)
+          .json({ success: false, message: "Seats no longer available" });
+      }
+
+      console.log(
+        `📉 Atomically decremented ${booking.seats} seat(s) — ${pkg.seatsAvailable} remaining`,
+      );
+
+      // ✅ Confirm booking inside the same transaction
+      booking.status = "CONFIRMED";
+      booking.paymentStatus = "SUCCESS";
+      booking.razorpayPaymentId = razorpay_payment_id;
+      booking.isPaymentVerified = true;
+      booking.paymentVerifiedAt = new Date();
+      booking.confirmedAt = new Date();
+      await booking.save({ session });
+
+      await session.commitTransaction();
+      session.endSession();
+    } catch (txnErr) {
+      await session.abortTransaction();
+      session.endSession();
+      throw txnErr;
     }
-
-    // ✅ Deduct seats
-    console.log(`📉 Deducting ${booking.seats} seats from package ${pkg._id}`);
-    pkg.seatsAvailable -= booking.seats;
-    await pkg.save();
-
-    // ✅ Confirm booking
-    console.log(`✅ Confirming booking ${booking._id} after payment`);
-
-    booking.status = "CONFIRMED";
-    booking.paymentStatus = "SUCCESS";
-    booking.razorpayPaymentId = razorpay_payment_id;
-    booking.isPaymentVerified = true;
-    booking.paymentVerifiedAt = new Date();
-    booking.confirmedAt = new Date();
-    await booking.save();
 
     console.log(`🎉 Booking ${booking._id} confirmed successfully!`);
 
