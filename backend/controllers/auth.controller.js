@@ -54,8 +54,6 @@ const register = async (req, res) => {
       { upsert: true },
     );
 
-    console.log(`Your OTP : ${otp}`);
-
     await sendEmail(
       user.email,
       "Your OTP Code",

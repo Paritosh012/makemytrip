@@ -82,13 +82,13 @@ ROUTES
 -------------------------------------------------------
 */
 
-// Apply limiter BEFORE routes so it actually fires
+// AUTH (no limiter on /me)
+app.use("/api/auth", authRoutes);
+
+// Apply limiter ONLY to sensitive endpoints
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 app.use("/api/auth/verify-otp", authLimiter);
-
-// AUTH (limiter-free routes like /me fall through to here)
-app.use("/api/auth", authRoutes);
 
 // NO limiter on normal app routes
 app.use("/api/admin", adminRoutes);
