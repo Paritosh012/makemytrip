@@ -15,7 +15,7 @@ const SiteHeader = () => {
     setOpen(false);
     try {
       await dispatch(logoutUser()).unwrap();
-      navigate("/");
+      navigate("/login");
     } catch (err) {
       console.error("Logout failed:", err);
     }

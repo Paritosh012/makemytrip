@@ -220,7 +220,9 @@ const getBookingsByHost = async (req, res) => {
     }
 
     // ✅ Get all packages owned by this HOST
-    const hostPackages = await Package.find({ hostId: userId }).select("_id");
+    const hostPackages = await packageModel
+      .find({ createdBy: userId })
+      .select("_id");
     const packageIds = hostPackages.map((p) => p._id);
 
     if (packageIds.length === 0) {
@@ -228,7 +230,8 @@ const getBookingsByHost = async (req, res) => {
     }
 
     // ✅ Get all bookings for these packages
-    const bookings = await Booking.find({ packageId: { $in: packageIds } })
+    const bookings = await bookingModel
+      .find({ packageId: { $in: packageIds } })
       .sort({ createdAt: -1 })
       .lean();
 
