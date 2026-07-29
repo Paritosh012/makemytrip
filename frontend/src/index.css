@@ -4,6 +4,7 @@
    The public customer site uses site.css (scoped under .site).
 
    Rebuilt for maintainability — same visual identity.
+   v2: mobile pass — fluid sizing, scroll-safe modals, iOS input fix.
    Structure:
      1. Reset & design tokens
      2. Base elements
@@ -735,7 +736,7 @@ td .actions {
 }
 .page-header h1 {
   font-family: var(--font-head);
-  font-size: 28px;
+  font-size: clamp(23px, 5.5vw, 28px);
   color: var(--ink);
 }
 .page-header p {
@@ -1093,6 +1094,7 @@ td .actions {
 
 .auth-wrap {
   min-height: 100vh;
+  min-height: 100svh; /* mobile browsers: ignore the address bar */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1113,7 +1115,7 @@ td .actions {
 }
 
 .auth-card h1 {
-  font-size: 30px;
+  font-size: clamp(24px, 7vw, 30px);
   margin-bottom: 4px;
 }
 
@@ -1183,6 +1185,8 @@ td .actions {
   justify-content: center;
   padding: 20px;
   backdrop-filter: blur(2px);
+  overflow-y: auto; /* short viewports can scroll the overlay */
+  overscroll-behavior: contain;
 }
 
 .modal {
@@ -1193,6 +1197,9 @@ td .actions {
   padding: 28px;
   box-shadow: var(--shadow-lg);
   animation: modal-pop 0.18s ease;
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
 }
 
 @keyframes modal-pop {
@@ -1329,6 +1336,7 @@ td .actions {
 
 /* --- Tablet: ≤1024px --- */
 @media (max-width: 1024px) {
+  .grid-3,
   .grid-4 {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1425,6 +1433,36 @@ td .actions {
     height: 48px;
     font-size: 18px;
   }
+
+  /* iOS zooms the page when a focused input is under 16px */
+  .form-group input,
+  .form-group select,
+  .form-group textarea,
+  .toolbar input,
+  .toolbar select,
+  .form-select {
+    font-size: 16px;
+  }
+
+  /* Comfortable tap targets & tighter chrome on phones */
+  .btn-sm {
+    padding: 9px 14px;
+  }
+  th {
+    padding: 10px;
+  }
+  td {
+    padding: 12px 10px;
+  }
+  .card {
+    padding: 18px;
+  }
+  .modal {
+    padding: 22px;
+  }
+  .flex-between {
+    flex-wrap: wrap;
+  }
 }
 
 /* --- Small phones: ≤480px --- */
@@ -1447,5 +1485,22 @@ td .actions {
 
   .user-avatar .user-name {
     max-width: 110px;
+  }
+
+  .container {
+    padding: 0 16px;
+  }
+
+  .toolbar {
+    flex-direction: column;
+  }
+  .toolbar input,
+  .toolbar select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .modal-overlay {
+    padding: 14px;
   }
 }

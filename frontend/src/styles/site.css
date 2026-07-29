@@ -3,6 +3,9 @@
    Everything is scoped under .site so the host/admin
    dashboards and auth screens are untouched.
 
+   v2: mobile pass — tablet nav fix (hamburger from ≤980), fluid
+   spacing via clamp(), iOS input-zoom fix, larger touch targets.
+
    Note: the y- class prefix (.ybtn, .ymodal, .ynotice…) is a
    legacy naming convention — keep the names, JSX depends on them.
 
@@ -289,6 +292,10 @@
   font-size: 13.5px;
   font-weight: 600;
   color: var(--ink);
+  max-width: 140px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hamburger {
@@ -337,7 +344,7 @@
 
 .hero {
   position: relative;
-  padding: 64px 0 56px;
+  padding: clamp(40px, 8vw, 64px) 0 clamp(36px, 7vw, 56px);
   background:
     radial-gradient(
       60% 120% at 85% -10%,
@@ -388,7 +395,7 @@
   -webkit-text-fill-color: transparent;
 }
 .hero .lede {
-  font-size: 18px;
+  font-size: clamp(16px, 4.3vw, 18px);
   color: var(--muted);
   max-width: 520px;
   margin-bottom: 28px;
@@ -593,7 +600,7 @@
 /* ====================== 6. SECTIONS & CHIPS ====================== */
 
 .section {
-  padding: 76px 0;
+  padding: clamp(48px, 8vw, 76px) 0;
 }
 .section.soft {
   background: var(--bg-soft);
@@ -601,7 +608,7 @@
 
 .section-head {
   max-width: 640px;
-  margin: 0 auto 44px;
+  margin: 0 auto clamp(30px, 6vw, 44px);
   text-align: center;
 }
 .section-head.left {
@@ -985,7 +992,7 @@
 /* ====================== 11. CTA BAND ====================== */
 
 .cta {
-  padding: 70px 0;
+  padding: clamp(48px, 9vw, 70px) 0;
   background: linear-gradient(
     120deg,
     var(--brand) 0%,
@@ -1014,7 +1021,7 @@
 .site-footer {
   background: #0c1424;
   color: #aab3c2;
-  padding: 60px 0 26px;
+  padding: clamp(44px, 8vw, 60px) 0 26px;
 }
 
 .site-footer .cols {
@@ -1634,13 +1641,9 @@
   .site-nav {
     display: none;
   }
-  .site-footer .cols {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-/* --- Mobile: ≤640px --- */
-@media (max-width: 640px) {
+  /* The nav collapses at this width, so the hamburger takes over
+     here — previously it only appeared at ≤640, leaving tablet
+     users (641–980px) with no navigation at all. */
   .hamburger {
     display: flex;
   }
@@ -1650,6 +1653,13 @@
   .site-header .right .desktop-only {
     display: none;
   }
+  .site-footer .cols {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* --- Mobile: ≤640px --- */
+@media (max-width: 640px) {
   .cards,
   .feature-grid,
   .tgrid,
@@ -1663,7 +1673,38 @@
   .site-page .host-benefits {
     grid-template-columns: 1fr;
   }
-  .section {
-    padding: 56px 0;
+
+  .site .container {
+    padding: 0 16px;
+  }
+
+  /* iOS zooms the page when a focused input is under 16px */
+  .searchbar .field input,
+  .site-page .form-group input,
+  .site-page .form-group textarea,
+  .site-page .form-group select {
+    font-size: 16px;
+  }
+
+  /* Modal comfort on small screens */
+  .ymodal-overlay {
+    padding: 14px;
+  }
+  .ymodal .mbody {
+    padding: 18px 16px;
+  }
+  .ymodal .mclose {
+    width: 40px;
+    height: 40px; /* comfortable tap target */
+  }
+}
+
+/* Respect users who turn animations off */
+@media (prefers-reduced-motion: reduce) {
+  .photo.p1,
+  .photo.p2,
+  .photo.p3,
+  .ymodal {
+    animation: none;
   }
 }
