@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const subscriptionModel = require("../models/subscription.model");
 const packageModel = require("../models/package.model");
 const bookingModel = require("../models/booking.model");
+const { calcTotal } = require("../utils/pricing");
 
 // =============================
 // CREATE BOOKING
@@ -76,7 +77,7 @@ const createBooking = async (req, res) => {
           userId,
           status: "PENDING",
           paymentStatus: "PENDING",
-          price: pkg.price * seats,
+          price: calcTotal(pkg.price, seats),
           seats,
         },
       ],

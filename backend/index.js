@@ -38,7 +38,7 @@ app.use(
   cors({
     origin: function (origin, callback) {
       if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);  
+        callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS")); // ❌ block
       }
@@ -82,13 +82,14 @@ ROUTES
 -------------------------------------------------------
 */
 
-// AUTH (no limiter on /me)
-app.use("/api/auth", authRoutes);
 
 // Apply limiter ONLY to sensitive endpoints
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 app.use("/api/auth/verify-otp", authLimiter);
+
+// AUTH (no limiter on /me)
+app.use("/api/auth", authRoutes);
 
 // NO limiter on normal app routes
 app.use("/api/admin", adminRoutes);
@@ -106,7 +107,6 @@ ERROR HANDLER
 -------------------------------------------------------
 */
 app.use(errorMiddleware);
-
 /*
 -------------------------------------------------------
 SERVER START
@@ -114,13 +114,20 @@ SERVER START
 */
 const PORT = process.env.PORT || 5000;
 
-connectDB()
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+// Only connect + listen when run directly (node index.js).
+// When Jest require()s this file, skip both so tests don't hang
+// on an open DB connection or try to bind a port.
+if (require.main === module) {
+  connectDB()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error("DB connection failed:", err);
+      process.exit(1);
     });
-  })
-  .catch((err) => {
-    console.error("DB connection failed:", err);
-    process.exit(1);
-  });
+}
+
+module.exports = app;
