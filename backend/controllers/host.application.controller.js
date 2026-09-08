@@ -141,7 +141,7 @@ const approveApplication = async (req, res) => {
       const application = await HostApplication.findOneAndUpdate(
         { _id: applicationId, status: "PENDING" },
         { status: "PROCESSING" },
-        { new: true, session },
+        { returnDocument: "after", session },
       );
 
       if (!application) {
@@ -225,7 +225,7 @@ const rejectApplication = async (req, res) => {
         reviewedBy: req.user.userId,
         reviewedAt: new Date(),
       },
-      { new: true },
+      { returnDocument: "after" },
     );
 
     if (!application) {
@@ -247,7 +247,7 @@ const rejectApplication = async (req, res) => {
       message: "Reject failed",
     });
   }
-};  
+};
 
 module.exports = {
   submitApplication,

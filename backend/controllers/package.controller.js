@@ -315,7 +315,7 @@ const deletePackage = async (req, res) => {
     const pkg = await Package.findOneAndUpdate(
       { _id: id, tenantId },
       { status: "ARCHIVED" },
-      { new: true },
+      { returnDocument: "after" },
     );
 
     if (!pkg) {
