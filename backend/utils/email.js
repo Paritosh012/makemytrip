@@ -5,8 +5,8 @@
 
 const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
 
-const FROM_EMAIL = process.env.EMAIL_FROM || "no-reply@example.com";
-const FROM_NAME = process.env.EMAIL_FROM_NAME || "Travel SaaS";
+const FROM_EMAIL = process.env.EMAIL_FROM || "no-reply@yatri.com";
+const FROM_NAME = process.env.EMAIL_FROM_NAME || "Yatri";
 
 async function sendEmail(to, subject, html) {
   if (!process.env.BREVO_API_KEY) {
