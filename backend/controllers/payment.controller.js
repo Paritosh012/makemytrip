@@ -203,7 +203,7 @@ const verifyPayment = async (req, res) => {
         {
           $inc: { seatsAvailable: -booking.seats },
         },
-        { new: true, session },
+        { returnDocument: "after", session },
       );
 
       if (!pkg) {
@@ -213,11 +213,48 @@ const verifyPayment = async (req, res) => {
         console.error(
           `❌ Atomic seat decrement failed — not enough seats for booking ${booking._id}`,
         );
-        booking.paymentStatus = "FAILED";
+
+        // Razorpay has already captured this payment (signature was valid
+        // above), so failing here without a refund means the customer paid
+        // for a seat that no longer exists. Issue a full refund immediately
+        // so money is never held for a booking that didn't happen.
+        let refundIssued = false;
+        try {
+          const refund = await getRazorpay().payments.refund(
+            razorpay_payment_id,
+            {
+              amount: booking.price * 100,
+              speed: "optimum",
+              notes: {
+                reason: "seats_unavailable_at_verification",
+                bookingId: booking._id.toString(),
+              },
+            },
+          );
+          refundIssued = true;
+          console.log(
+            `💸 Auto-refund issued for booking ${booking._id}: ${refund.id}`,
+          );
+        } catch (refundErr) {
+          // If the refund call itself fails, we still must not silently eat
+          // the customer's money — log loudly so this becomes an ops alert,
+          // not a support ticket discovered days later.
+          console.error(
+            `🚨 REFUND FAILED for booking ${booking._id}, payment ${razorpay_payment_id}:`,
+            refundErr.message,
+          );
+        }
+
+        booking.paymentStatus = refundIssued ? "REFUNDED" : "FAILED";
+        booking.razorpayPaymentId = razorpay_payment_id;
         await booking.save();
-        return res
-          .status(400)
-          .json({ success: false, message: "Seats no longer available" });
+
+        return res.status(400).json({
+          success: false,
+          message: refundIssued
+            ? "Seats no longer available. Your payment has been refunded."
+            : "Seats no longer available. Refund could not be processed automatically — contact support.",
+        });
       }
 
       console.log(
