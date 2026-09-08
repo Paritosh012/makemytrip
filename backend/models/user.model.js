@@ -2,6 +2,8 @@
 
 const mongoose = require("mongoose");
 
+const PERMISSIONS = require("../config/permissions");
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -17,7 +19,7 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      select: false, // only fetched when explicitly needed
+      select: false,
     },
     isVerified: {
       type: Boolean,
@@ -28,17 +30,14 @@ const userSchema = new mongoose.Schema(
       enum: ["SUPER_ADMIN", "HOST", "END_USER", "ADMIN"],
       default: "END_USER",
     },
+    // Enum pulled from config/permissions.js so there is ONE source of truth.
+    // Previously this list was missing MANAGE_USERS while admin.routes.js
+    // required it — meaning that permission could never be saved, and every
+    // /api/admin/users write was permanently 403 for non-SUPER_ADMINs.
     permissions: [
       {
         type: String,
-        enum: [
-          "VIEW_USERS",
-          "EDIT_USERS",
-          "DELETE_USERS",
-          "VIEW_TENANTS",
-          "MANAGE_TENANTS",
-          "APPROVE_HOSTS",
-        ],
+        enum: PERMISSIONS,
       },
     ],
 

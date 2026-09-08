@@ -4,7 +4,10 @@ const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-const rateLimit = require("express-rate-limit");
+const {
+  apiLimiter,
+  paymentLimiter,
+} = require("./middlewares/rateLimiter.middleware");
 
 const connectDB = require("./config/db");
 
@@ -47,17 +50,9 @@ app.use(
   }),
 );
 
-// 🔥 Rate limit (general)
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-});
-
-// 🔥 Stricter limiter for auth
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-});
+// Behind Render's proxy, so req.ip must come from X-Forwarded-For.
+// Without this every request shares the proxy's IP and one user's failed
+// logins would rate-limit the entire site.
 app.set("trust proxy", 1);
 
 app.use(helmet());
@@ -82,13 +77,10 @@ ROUTES
 -------------------------------------------------------
 */
 
+// Blunt catch-all against scrapers. Per-endpoint limits live in the route
+// files themselves, which is where they are visible to whoever edits them.
+app.use("/api", apiLimiter);
 
-// Apply limiter ONLY to sensitive endpoints
-app.use("/api/auth/login", authLimiter);
-app.use("/api/auth/register", authLimiter);
-app.use("/api/auth/verify-otp", authLimiter);
-
-// AUTH (no limiter on /me)
 app.use("/api/auth", authRoutes);
 
 // NO limiter on normal app routes
@@ -99,7 +91,7 @@ app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/bookings", bookingRoutes);
 
 // Optional limiter for payments
-app.use("/api/payments", globalLimiter, paymentRoutes);
+app.use("/api/payments", paymentLimiter, paymentRoutes);
 
 /*
 -------------------------------------------------------

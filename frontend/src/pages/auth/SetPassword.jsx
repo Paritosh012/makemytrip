@@ -1,38 +1,46 @@
-import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import * as authService from '../../services/auth.service'
+import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import * as authService from "../../services/auth.service";
 
 const SetPassword = () => {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const email = location.state?.email || ''
+  const navigate = useNavigate();
+  const location = useLocation();
+  const email = location.state?.email || "";
+  const setupToken = location.state?.setupToken;
 
-  const [form, setForm] = useState({ password: '', confirm: '' })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [form, setForm] = useState({ password: "", confirm: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
+  const handleChange = (e) =>
+    setForm({ ...form, [e.target.name]: e.target.value });
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (form.password.length < 6) return setError('Password must be at least 6 characters')
-    if (form.password !== form.confirm) return setError('Passwords do not match')
-    setError('')
-    setLoading(true)
+    e.preventDefault();
+    if (form.password.length < 8)
+      return setError("Password must be at least 8 characters");
+    if (form.password !== form.confirm)
+      return setError("Passwords do not match");
+    setError("");
+    setLoading(true);
     try {
-      await authService.setPassword({ email, password: form.password })
-      navigate('/login', { state: { message: 'Account created! Please sign in.' } })
+      await authService.setPassword({ password: form.password, setupToken });
+      navigate("/login", {
+        state: { message: "Account created! Please sign in." },
+      });
     } catch (err) {
-      setError(err.message)
+      setError(err.message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="auth-wrap">
       <div className="auth-card">
-        <h1>Set password<span style={{ color: 'var(--accent)' }}>.</span></h1>
+        <h1>
+          Set password<span style={{ color: "var(--accent)" }}>.</span>
+        </h1>
         <p className="subtitle">Choose a secure password for your account</p>
 
         {error && <div className="alert alert-error">{error}</div>}
@@ -45,7 +53,7 @@ const SetPassword = () => {
               name="password"
               value={form.password}
               onChange={handleChange}
-              placeholder="Min. 6 characters"
+              placeholder="Min. 8 characters"
               required
             />
           </div>
@@ -61,12 +69,12 @@ const SetPassword = () => {
             />
           </div>
           <button className="btn btn-primary" disabled={loading}>
-            {loading ? 'Setting password...' : 'Create Account'}
+            {loading ? "Setting password..." : "Create Account"}
           </button>
         </form>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default SetPassword
+export default SetPassword;
